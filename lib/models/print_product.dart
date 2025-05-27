@@ -48,11 +48,15 @@ class PrintProduct {
     final max = prices.reduce((a, b) => a > b ? a : b);
 
     if (min == max) {
-      return '\${min.toStringAsFixed(2)}';
+      return '\$${min.toStringAsFixed(2)}';
     } else {
-      return '\${min.toStringAsFixed(2)} - \${max.toStringAsFixed(2)}';
+      return '\$${min.toStringAsFixed(2)} - \$${max.toStringAsFixed(2)}';
     }
   }
+
+  // Add missing getters that PrintShop expects
+  String get type => category; // PrintShop expects 'type' but you have 'category'
+  List<String> get images => imageUrls; // PrintShop expects 'images' but you have 'imageUrls'
 }
 
 class ProductVariant {
@@ -96,4 +100,88 @@ class ProductVariant {
   }
 
   String get displayName => '$color $size';
+}
+
+// Add the OrderItem class that PrintShop needs
+class OrderItem {
+  final int variantId;
+  final String productName;
+  final String variantName;
+  final double price;
+  final int quantity;
+  final String? id;
+  final int? productId;
+  final String? imageUrl;
+  final String? customImageId;
+  final Map<String, dynamic>? printSettings;
+
+  OrderItem({
+    required this.variantId,
+    required this.productName,
+    required this.variantName,
+    required this.price,
+    required this.quantity,
+    this.id,
+    this.productId,
+    this.imageUrl,
+    this.customImageId,
+    this.printSettings,
+  });
+
+  // Add the copyWith method that PrintShop needs
+  OrderItem copyWith({
+    int? variantId,
+    String? productName,
+    String? variantName,
+    double? price,
+    int? quantity,
+    String? id,
+    int? productId,
+    String? imageUrl,
+    String? customImageId,
+    Map<String, dynamic>? printSettings,
+  }) {
+    return OrderItem(
+      variantId: variantId ?? this.variantId,
+      productName: productName ?? this.productName,
+      variantName: variantName ?? this.variantName,
+      price: price ?? this.price,
+      quantity: quantity ?? this.quantity,
+      id: id ?? this.id,
+      productId: productId ?? this.productId,
+      imageUrl: imageUrl ?? this.imageUrl,
+      customImageId: customImageId ?? this.customImageId,
+      printSettings: printSettings ?? this.printSettings,
+    );
+  }
+
+  factory OrderItem.fromJson(Map<String, dynamic> json) {
+    return OrderItem(
+      variantId: json['variantId'],
+      productName: json['productName'],
+      variantName: json['variantName'],
+      price: (json['price'] as num).toDouble(),
+      quantity: json['quantity'],
+      id: json['id'],
+      productId: json['productId'],
+      imageUrl: json['imageUrl'],
+      customImageId: json['customImageId'],
+      printSettings: json['printSettings'],
+    );
+  }
+
+  Map<String, dynamic> toJson() {
+    return {
+      'variantId': variantId,
+      'productName': productName,
+      'variantName': variantName,
+      'price': price,
+      'quantity': quantity,
+      'id': id,
+      'productId': productId,
+      'imageUrl': imageUrl,
+      'customImageId': customImageId,
+      'printSettings': printSettings,
+    };
+  }
 }

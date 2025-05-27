@@ -1,6 +1,7 @@
 // lib/screens/spot_aurora_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
+import 'camera_aurora_screen.dart';
 
 class SpotAuroraScreen extends StatefulWidget {
   final double currentBzH;
@@ -17,66 +18,21 @@ class SpotAuroraScreen extends StatefulWidget {
 }
 
 class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
-  int _selectedIntensity = 3;
-  String _description = '';
-  bool _isSubmitting = false;
 
-  final _descriptionController = TextEditingController();
-
-  @override
-  void dispose() {
-    _descriptionController.dispose();
-    super.dispose();
-  }
-
-  Future<void> _submitSighting() async {
-    setState(() {
-      _isSubmitting = true;
-    });
-
-    // Simulate submission
-    await Future.delayed(const Duration(seconds: 2));
-
-    if (mounted) {
-      _showSuccessDialog();
-    }
-  }
-
-  void _showSuccessDialog() {
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        backgroundColor: Colors.black,
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
-        title: Row(
-          children: [
-            Icon(Icons.check_circle, color: Colors.tealAccent, size: 28),
-            SizedBox(width: 12),
-            Text(
-              'Aurora Spotted!',
-              style: TextStyle(color: Colors.tealAccent, fontSize: 18),
-            ),
-          ],
+  void _openCamera() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CameraAuroraScreen(
+          currentBzH: widget.currentBzH,
+          currentKp: widget.currentKp,
         ),
-        content: Text(
-          'Your aurora sighting has been shared with the community. Other users in your area will be notified!',
-          style: TextStyle(color: Colors.white70),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () {
-              Navigator.of(context).pop(); // Close dialog
-              Navigator.of(context).pop(); // Close screen
-            },
-            child: Text(
-              'AWESOME!',
-              style: TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold),
-            ),
-          ),
-        ],
+        fullscreenDialog: true,
       ),
-    );
+    ).then((_) {
+      // When returning from camera, close this screen too
+      Navigator.of(context).pop();
+    });
   }
 
   @override
@@ -100,210 +56,172 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
         centerTitle: true,
       ),
       body: SafeArea(
-        child: Column(
-          children: [
-            // Current conditions
-            Container(
-              margin: const EdgeInsets.all(16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.tealAccent.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
-              ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
-                children: [
-                  _buildConditionItem('BzH', '${widget.currentBzH.toStringAsFixed(1)} nT'),
-                  _buildConditionItem('Kp', widget.currentKp.toStringAsFixed(1)),
-                  _buildConditionItem('Status', 'Good Conditions'),
-                ],
-              ),
-            ),
-
-            Expanded(
-              child: Container(
-                margin: const EdgeInsets.all(16),
-                padding: const EdgeInsets.all(24),
+        child: Padding(
+          padding: const EdgeInsets.all(24),
+          child: Column(
+            children: [
+              // Current conditions banner
+              Container(
+                padding: const EdgeInsets.all(16),
                 decoration: BoxDecoration(
                   gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
                     colors: [
+                      Colors.tealAccent.withOpacity(0.2),
                       Colors.tealAccent.withOpacity(0.1),
-                      Colors.black.withOpacity(0.8),
                     ],
                   ),
-                  borderRadius: BorderRadius.circular(20),
+                  borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
                 ),
-                child: Column(
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    Icon(
-                      Icons.camera_alt,
-                      size: 64,
-                      color: Colors.tealAccent,
-                    ),
-                    SizedBox(height: 16),
-                    Text(
-                      'Camera Feature Coming Soon!',
-                      style: TextStyle(
-                        color: Colors.tealAccent,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      'For now, share your aurora sighting details:',
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
-                      ),
-                      textAlign: TextAlign.center,
-                    ),
-                    SizedBox(height: 32),
+                    _buildConditionItem('BzH', '${widget.currentBzH.toStringAsFixed(1)} nT'),
+                    _buildConditionItem('Kp', widget.currentKp.toStringAsFixed(1)),
+                    _buildConditionItem('Status', _getConditionsText()),
+                  ],
+                ),
+              ),
 
-                    // Intensity selector
-                    Text(
-                      'Aurora Intensity',
-                      style: TextStyle(
-                        color: Colors.tealAccent,
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                    SizedBox(height: 16),
-                    Row(
-                      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                      children: List.generate(5, (index) {
-                        final intensity = index + 1;
-                        final isSelected = intensity == _selectedIntensity;
-                        return GestureDetector(
-                          onTap: () {
-                            HapticFeedback.selectionClick();
-                            setState(() {
-                              _selectedIntensity = intensity;
-                            });
-                          },
+              SizedBox(height: 40),
+
+              Expanded(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    // Camera icon with pulsing animation
+                    TweenAnimationBuilder<double>(
+                      tween: Tween(begin: 0.8, end: 1.2),
+                      duration: Duration(seconds: 2),
+                      builder: (context, scale, child) {
+                        return Transform.scale(
+                          scale: scale,
                           child: Container(
-                            width: 50,
-                            height: 50,
+                            width: 120,
+                            height: 120,
                             decoration: BoxDecoration(
                               shape: BoxShape.circle,
-                              color: isSelected ? Colors.tealAccent : Colors.transparent,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.tealAccent.withOpacity(0.3),
+                                  Colors.tealAccent.withOpacity(0.1),
+                                ],
+                              ),
                               border: Border.all(
                                 color: Colors.tealAccent,
-                                width: 2,
+                                width: 3,
                               ),
-                            ),
-                            child: Center(
-                              child: Text(
-                                intensity.toString(),
-                                style: TextStyle(
-                                  color: isSelected ? Colors.black : Colors.tealAccent,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.tealAccent.withOpacity(0.5),
+                                  blurRadius: 20,
+                                  spreadRadius: 5,
                                 ),
-                              ),
+                              ],
+                            ),
+                            child: Icon(
+                              Icons.camera_alt,
+                              size: 60,
+                              color: Colors.tealAccent,
                             ),
                           ),
                         );
-                      }),
-                    ),
-                    SizedBox(height: 8),
-                    Text(
-                      _getIntensityDescription(_selectedIntensity),
-                      style: TextStyle(
-                        color: Colors.white70,
-                        fontSize: 12,
-                        fontStyle: FontStyle.italic,
-                      ),
-                      textAlign: TextAlign.center,
+                      },
+                      onEnd: () => setState(() {}), // Trigger rebuild for continuous animation
                     ),
 
                     SizedBox(height: 32),
 
-                    // Description input
-                    TextField(
-                      controller: _descriptionController,
-                      style: TextStyle(color: Colors.white),
-                      maxLength: 200,
-                      decoration: InputDecoration(
-                        hintText: 'Describe what you see...',
-                        hintStyle: TextStyle(color: Colors.white54),
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.tealAccent.withOpacity(0.5)),
-                        ),
-                        enabledBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.tealAccent.withOpacity(0.5)),
-                        ),
-                        focusedBorder: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
-                          borderSide: BorderSide(color: Colors.tealAccent),
-                        ),
-                        counterStyle: TextStyle(color: Colors.white54),
+                    Text(
+                      'Capture the Aurora!',
+                      style: TextStyle(
+                        color: Colors.tealAccent,
+                        fontSize: 28,
+                        fontWeight: FontWeight.bold,
                       ),
-                      onChanged: (value) {
-                        _description = value;
-                      },
+                      textAlign: TextAlign.center,
                     ),
 
-                    Spacer(),
+                    SizedBox(height: 16),
 
-                    // Submit button
-                    SizedBox(
-                      width: double.infinity,
-                      height: 50,
-                      child: ElevatedButton(
-                        onPressed: _isSubmitting ? null : _submitSighting,
+                    Text(
+                      'Take a photo and share your aurora sighting with the community. Your photo will appear on the map and be available for printing!',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                        height: 1.5,
+                      ),
+                      textAlign: TextAlign.center,
+                    ),
+
+                    SizedBox(height: 40),
+
+                    // Camera button
+                    Container(
+                      width: 200,
+                      height: 60,
+                      child: ElevatedButton.icon(
+                        onPressed: _openCamera,
                         style: ElevatedButton.styleFrom(
                           backgroundColor: Colors.tealAccent,
                           foregroundColor: Colors.black,
                           shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(25),
+                            borderRadius: BorderRadius.circular(30),
                           ),
                           elevation: 8,
+                          shadowColor: Colors.tealAccent.withOpacity(0.5),
                         ),
-                        child: _isSubmitting
-                            ? Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            SizedBox(
-                              width: 20,
-                              height: 20,
-                              child: CircularProgressIndicator(
-                                strokeWidth: 2,
-                                color: Colors.black,
-                              ),
-                            ),
-                            SizedBox(width: 12),
-                            Text(
-                              'Sharing...',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        )
-                            : Text(
-                          '🌌 SHARE AURORA SIGHTING',
+                        icon: Icon(Icons.camera_alt, size: 24),
+                        label: Text(
+                          'OPEN CAMERA',
                           style: TextStyle(
-                            fontSize: 16,
+                            fontSize: 18,
                             fontWeight: FontWeight.bold,
-                            letterSpacing: 0.5,
+                            letterSpacing: 1,
                           ),
                         ),
+                      ),
+                    ),
+
+                    SizedBox(height: 24),
+
+                    // Instructions
+                    Container(
+                      padding: EdgeInsets.all(16),
+                      decoration: BoxDecoration(
+                        color: Colors.white.withOpacity(0.05),
+                        borderRadius: BorderRadius.circular(12),
+                        border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      ),
+                      child: Column(
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.tips_and_updates, color: Colors.amber, size: 20),
+                              SizedBox(width: 8),
+                              Text(
+                                'Photography Tips',
+                                style: TextStyle(
+                                  color: Colors.amber,
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          SizedBox(height: 12),
+                          _buildTip('📱', 'Hold your phone steady for 2-3 seconds'),
+                          _buildTip('🌙', 'Use night mode if available'),
+                          _buildTip('⚡', 'Turn off flash for better results'),
+                          _buildTip('🎯', 'Focus on the horizon or aurora'),
+                        ],
                       ),
                     ),
                   ],
                 ),
               ),
-            ),
-          ],
+            ],
+          ),
         ),
       ),
     );
@@ -321,6 +239,7 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
             fontWeight: FontWeight.bold,
           ),
         ),
+        SizedBox(height: 4),
         Text(
           value,
           style: TextStyle(
@@ -333,14 +252,36 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
     );
   }
 
-  String _getIntensityDescription(int intensity) {
-    switch (intensity) {
-      case 1: return '⭐ Faint - Barely visible';
-      case 2: return '⭐⭐ Weak - Light green glow';
-      case 3: return '⭐⭐⭐ Moderate - Clear aurora';
-      case 4: return '⭐⭐⭐⭐ Strong - Bright dancing';
-      case 5: return '⭐⭐⭐⭐⭐ EXCEPTIONAL - Incredible!';
-      default: return 'Select intensity';
+  Widget _buildTip(String emoji, String text) {
+    return Padding(
+      padding: EdgeInsets.only(bottom: 8),
+      child: Row(
+        children: [
+          Text(emoji, style: TextStyle(fontSize: 16)),
+          SizedBox(width: 12),
+          Expanded(
+            child: Text(
+              text,
+              style: TextStyle(
+                color: Colors.white70,
+                fontSize: 13,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _getConditionsText() {
+    if (widget.currentBzH > 4.5 || widget.currentKp >= 4.0) {
+      return 'Excellent!';
+    } else if (widget.currentBzH > 3.0 || widget.currentKp >= 3.0) {
+      return 'Good';
+    } else if (widget.currentBzH > 1.5 || widget.currentKp >= 2.0) {
+      return 'Fair';
+    } else {
+      return 'Possible';
     }
   }
 }

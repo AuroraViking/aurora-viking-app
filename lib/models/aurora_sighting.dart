@@ -35,18 +35,52 @@ class AuroraSighting {
   /// Create from Firestore document
   factory AuroraSighting.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+
+    // Handle location data - could be GeoPoint or Map
+    GeoPoint location;
+    if (data['location'] is GeoPoint) {
+      location = data['location'] as GeoPoint;
+    } else if (data['location'] is Map<String, dynamic>) {
+      final locationMap = data['location'] as Map<String, dynamic>;
+      location = GeoPoint(
+        locationMap['latitude']?.toDouble() ?? 0.0,
+        locationMap['longitude']?.toDouble() ?? 0.0,
+      );
+    } else {
+      location = const GeoPoint(0.0, 0.0);
+    }
+
+    // Handle timestamp
+    DateTime timestamp;
+    if (data['timestamp'] is Timestamp) {
+      timestamp = (data['timestamp'] as Timestamp).toDate();
+    } else {
+      timestamp = DateTime.now();
+    }
+
+    // Handle photo URLs - could be single URL or list
+    List<String> photoUrls = [];
+    if (data['photoUrl'] != null) {
+      photoUrls = [data['photoUrl'] as String];
+    } else if (data['photoUrls'] != null) {
+      photoUrls = List<String>.from(data['photoUrls']);
+    }
+
     return AuroraSighting(
       id: doc.id,
       userId: data['userId'] ?? '',
-      userName: data['userName'] ?? 'Anonymous',
-      timestamp: (data['timestamp'] as Timestamp).toDate(),
-      location: data['location'] as GeoPoint,
-      locationName: data['locationName'] ?? 'Unknown Location',
+      // Handle both userDisplayName and userName
+      userName: data['userName'] ?? data['userDisplayName'] ?? 'Anonymous',
+      timestamp: timestamp,
+      location: location,
+      // Handle both address and locationName
+      locationName: data['locationName'] ?? data['address'] ?? 'Unknown Location',
       intensity: data['intensity'] ?? 1,
       description: data['description'],
-      photoUrls: List<String>.from(data['photoUrls'] ?? []),
-      confirmations: data['confirmations'] ?? 0,
-      confirmedByUsers: List<String>.from(data['confirmedByUsers'] ?? []),
+      photoUrls: photoUrls,
+      // Handle verifications as confirmations
+      confirmations: (data['verifications'] as List?)?.length ?? data['confirmations'] ?? 0,
+      confirmedByUsers: List<String>.from(data['verifications'] ?? data['confirmedByUsers'] ?? []),
       isVerified: data['isVerified'] ?? false,
       weather: Map<String, dynamic>.from(data['weather'] ?? {}),
     );
