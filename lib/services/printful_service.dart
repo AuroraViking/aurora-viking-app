@@ -1,189 +1,94 @@
-// lib/services/printful_service.dart
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
+import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/print_product.dart';
-import '../models/print_order.dart';
 
 class PrintfulService {
-  static const String _baseUrl = 'https://api.printful.com';
-  static const String _apiKey = 'YOUR_PRINTFUL_API_KEY'; // Store securely
+  static final PrintfulService _instance = PrintfulService._internal();
+  factory PrintfulService() => _instance;
+  PrintfulService._internal();
 
-  /// Get available print products from Printful catalog
-  static Future<List<PrintProduct>> getProductCatalog() async {
+  static const String baseUrl = 'https://api.printful.com';
+
+  String get apiKey => dotenv.env['PRINTFUL_API_KEY'] ?? '';
+
+  Map<String, String> get headers => {
+    'Authorization': 'Bearer $apiKey',
+    'Content-Type': 'application/json',
+  };
+
+  // PRODUCT CATALOG METHODS
+
+  // Get all available products
+  Future<List<PrintProduct>> getProducts() async {
     try {
       final response = await http.get(
-        Uri.parse('$_baseUrl/products'),
-        headers: _getHeaders(),
+        Uri.parse('$baseUrl/products'),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final products = data['result'] as List;
+        final data = json.decode(response.body);
+        final products = <PrintProduct>[];
 
-        return products.map((product) => PrintProduct.fromPrintfulApi(product)).toList();
+        for (final item in data['result']) {
+          products.add(PrintProduct.fromPrintfulApi(item));
+        }
+
+        return products;
       } else {
         throw Exception('Failed to load products: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error fetching product catalog: ${e.toString()}');
+      print('Error fetching products: $e');
+      return _getMockProducts(); // Fallback to mock data
     }
   }
 
-  /// Get product variants (sizes, colors) for a specific product
-  static Future<List<ProductVariant>> getProductVariants(int productId) async {
+  // Get product variants (sizes, colors, etc.)
+  Future<List<ProductVariant>> getProductVariants(int productId) async {
     try {
       final response = await http.get(
-        Uri.parse('$_baseUrl/products/$productId'),
-        headers: _getHeaders(),
+        Uri.parse('$baseUrl/products/$productId'),
+        headers: headers,
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final variants = data['result']['variants'] as List;
+        final data = json.decode(response.body);
+        final variants = <ProductVariant>[];
 
-        return variants.map((variant) => ProductVariant.fromPrintfulApi(variant)).toList();
+        for (final item in data['result']['variants']) {
+          variants.add(ProductVariant.fromPrintfulApi(item));
+        }
+
+        return variants;
       } else {
         throw Exception('Failed to load variants: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error fetching variants: ${e.toString()}');
+      print('Error fetching variants: $e');
+      return [];
     }
   }
 
-  /// Create a new order with Printful
-  static Future<PrintOrder> createOrder({
-    required String userId,
-    required List<OrderItem> items,
-    required ShippingAddress address,
-    Map<String, dynamic>? metadata,
-  }) async {
-    try {
-      final orderData = {
-        'recipient': {
-          'name': address.fullName,
-          'company': address.company,
-          'address1': address.address1,
-          'address2': address.address2,
-          'city': address.city,
-          'state_code': address.stateCode,
-          'country_code': address.countryCode,
-          'zip': address.zipCode,
-          'phone': address.phone,
-          'email': address.email,
-        },
-        'items': items.map((item) => item.toPrintfulApi()).toList(),
-        'retail_costs': {
-          'currency': 'USD',
-          'subtotal': _calculateSubtotal(items),
-          'discount': 0,
-          'shipping': _calculateShipping(items, address),
-          'tax': _calculateTax(items, address),
-        },
-        'external_id': userId, // Your internal order ID
-      };
+  // MOCKUP GENERATION
 
-      if (metadata != null) {
-        orderData['metadata'] = metadata;
-      }
-
-      final response = await http.post(
-        Uri.parse('$_baseUrl/orders'),
-        headers: _getHeaders(),
-        body: jsonEncode(orderData),
-      );
-
-      if (response.statusCode == 200 || response.statusCode == 201) {
-        final data = jsonDecode(response.body);
-        return PrintOrder.fromPrintfulApi(data['result'], userId);
-      } else {
-        final error = jsonDecode(response.body);
-        throw Exception('Order creation failed: ${error['error']['message']}');
-      }
-    } catch (e) {
-      throw Exception('Error creating order: ${e.toString()}');
-    }
-  }
-
-  /// Confirm order for production
-  static Future<void> confirmOrder(String printfulOrderId) async {
-    try {
-      final response = await http.post(
-        Uri.parse('$_baseUrl/orders/$printfulOrderId/confirm'),
-        headers: _getHeaders(),
-      );
-
-      if (response.statusCode != 200) {
-        final error = jsonDecode(response.body);
-        throw Exception('Order confirmation failed: ${error['error']['message']}');
-      }
-    } catch (e) {
-      throw Exception('Error confirming order: ${e.toString()}');
-    }
-  }
-
-  /// Get order status and tracking info
-  static Future<OrderStatus> getOrderStatus(String printfulOrderId) async {
-    try {
-      final response = await http.get(
-        Uri.parse('$_baseUrl/orders/$printfulOrderId'),
-        headers: _getHeaders(),
-      );
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        return OrderStatusExtension.fromPrintfulApi(data['result']['status']);
-      } else {
-        throw Exception('Failed to get order status: ${response.statusCode}');
-      }
-    } catch (e) {
-      throw Exception('Error fetching order status: ${e.toString()}');
-    }
-  }
-
-  /// Upload image file for printing
-  static Future<String> uploadImage(File imageFile, String fileName) async {
-    try {
-      final request = http.MultipartRequest(
-        'POST',
-        Uri.parse('$_baseUrl/files'),
-      );
-
-      request.headers.addAll(_getHeaders());
-      request.fields['type'] = 'default';
-      request.files.add(await http.MultipartFile.fromPath('file', imageFile.path));
-
-      final response = await request.send();
-      final responseBody = await response.stream.bytesToString();
-
-      if (response.statusCode == 200) {
-        final data = jsonDecode(responseBody);
-        return data['result']['id'].toString();
-      } else {
-        final error = jsonDecode(responseBody);
-        throw Exception('Image upload failed: ${error['error']['message']}');
-      }
-    } catch (e) {
-      throw Exception('Error uploading image: ${e.toString()}');
-    }
-  }
-
-  /// Generate mockup for product with custom image
-  static Future<String> generateMockup({
+  // Generate product mockup with user's aurora photo
+  Future<String?> generateMockup({
     required int productId,
     required int variantId,
-    required String imageId,
-    Map<String, dynamic>? printAreaSettings,
+    required String imageUrl,
+    Map<String, dynamic>? options,
   }) async {
     try {
-      final mockupData = {
+      final body = {
         'variant_ids': [variantId],
-        'format': 'jpg',
         'files': [
           {
-            'placement': 'default',
-            'image_id': imageId,
-            'position': printAreaSettings ?? {
+            'placement': 'front',
+            'image_url': imageUrl,
+            'position': {
               'area_width': 1800,
               'area_height': 2400,
               'width': 1800,
@@ -192,174 +97,474 @@ class PrintfulService {
               'left': 0,
             }
           }
-        ]
+        ],
+        'options': options ?? {},
       };
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/mockup-generator/create-task/$productId'),
-        headers: _getHeaders(),
-        body: jsonEncode(mockupData),
+        Uri.parse('$baseUrl/mockup-generator/create-task/$productId'),
+        headers: headers,
+        body: json.encode(body),
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
+        final data = json.decode(response.body);
         final taskKey = data['result']['task_key'];
 
-        // Poll for mockup completion
-        return await _pollMockupResult(taskKey);
+        // Poll for completion
+        return await _waitForMockupCompletion(taskKey);
       } else {
-        final error = jsonDecode(response.body);
-        throw Exception('Mockup generation failed: ${error['error']['message']}');
+        throw Exception('Failed to create mockup: ${response.statusCode}');
       }
     } catch (e) {
-      throw Exception('Error generating mockup: ${e.toString()}');
+      print('Error generating mockup: $e');
+      return null;
     }
   }
 
-  /// Poll mockup generation result
-  static Future<String> _pollMockupResult(String taskKey) async {
-    for (int attempt = 0; attempt < 30; attempt++) {
-      await Future.delayed(const Duration(seconds: 2));
+  // Wait for mockup generation to complete
+  Future<String?> _waitForMockupCompletion(String taskKey) async {
+    for (int i = 0; i < 30; i++) { // Wait up to 30 seconds
+      await Future.delayed(const Duration(seconds: 1));
 
-      final response = await http.get(
-        Uri.parse('$_baseUrl/mockup-generator/task?task_key=$taskKey'),
-        headers: _getHeaders(),
-      );
+      try {
+        final response = await http.get(
+          Uri.parse('$baseUrl/mockup-generator/task?task_key=$taskKey'),
+          headers: headers,
+        );
 
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final result = data['result'];
+        if (response.statusCode == 200) {
+          final data = json.decode(response.body);
+          final status = data['result']['status'];
 
-        if (result['status'] == 'completed') {
-          return result['result'][0]['mockup_url'];
-        } else if (result['status'] == 'failed') {
-          throw Exception('Mockup generation failed');
+          if (status == 'completed') {
+            final mockups = data['result']['mockups'] as List;
+            if (mockups.isNotEmpty) {
+              return mockups.first['mockup_url'];
+            }
+          } else if (status == 'failed') {
+            throw Exception('Mockup generation failed');
+          }
         }
+      } catch (e) {
+        print('Error checking mockup status: $e');
       }
     }
 
-    throw Exception('Mockup generation timeout');
+    return null; // Timeout
   }
 
-  /// Calculate estimated shipping cost
-  static Future<double> calculateShipping({
-    required List<OrderItem> items,
-    required ShippingAddress address,
+  // SHIPPING & PRICING
+
+  // Calculate shipping rates - simplified
+  Future<List<ShippingRate>> calculateShipping({
+    required Map<String, dynamic> address,
+    required List<Map<String, dynamic>> items,
   }) async {
     try {
-      final shippingData = {
-        'recipient': {
-          'country_code': address.countryCode,
-          'state_code': address.stateCode,
-        },
-        'items': items.map((item) => {
-          'variant_id': item.variantId,
-          'quantity': item.quantity,
-        }).toList(),
-        'currency': 'USD',
-        'locale': 'en_US',
+      final body = {
+        'recipient': address,
+        'items': items,
       };
 
       final response = await http.post(
-        Uri.parse('$_baseUrl/shipping/rates'),
-        headers: _getHeaders(),
-        body: jsonEncode(shippingData),
+        Uri.parse('$baseUrl/shipping/rates'),
+        headers: headers,
+        body: json.encode(body),
       );
 
       if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final rates = data['result'] as List;
+        final data = json.decode(response.body);
+        final rates = <ShippingRate>[];
 
-        // Return cheapest standard shipping rate
-        if (rates.isNotEmpty) {
-          rates.sort((a, b) => a['rate'].compareTo(b['rate']));
-          return double.parse(rates.first['rate']);
+        for (final rate in data['result']) {
+          rates.add(ShippingRate.fromJson(rate));
         }
+
+        return rates;
+      } else {
+        throw Exception('Failed to calculate shipping: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error calculating shipping: $e');
+      return _getMockShippingRates();
+    }
+  }
+
+  // ORDER MANAGEMENT
+
+  // Create order - simplified to return order ID
+  Future<String?> createOrder({
+    required List<Map<String, dynamic>> items,
+    required Map<String, dynamic> shippingAddress,
+    required String shippingMethod,
+    Map<String, dynamic>? metadata,
+  }) async {
+    try {
+      final body = {
+        'recipient': shippingAddress,
+        'items': items,
+        'shipping': shippingMethod,
+        'external_id': 'aurora_${DateTime.now().millisecondsSinceEpoch}',
+        'metadata': metadata ?? {},
+      };
+
+      final response = await http.post(
+        Uri.parse('$baseUrl/orders'),
+        headers: headers,
+        body: json.encode(body),
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['result']['id'].toString();
+      } else {
+        throw Exception('Failed to create order: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error creating order: $e');
+      return null;
+    }
+  }
+
+  // Get order status - simplified
+  Future<Map<String, dynamic>?> getOrder(String orderId) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/orders/$orderId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        return data['result'];
+      } else {
+        throw Exception('Failed to get order: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error getting order: $e');
+      return null;
+    }
+  }
+
+  // Cancel order
+  Future<bool> cancelOrder(String orderId) async {
+    try {
+      final response = await http.delete(
+        Uri.parse('$baseUrl/orders/$orderId'),
+        headers: headers,
+      );
+
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error canceling order: $e');
+      return false;
+    }
+  }
+
+  // AURORA-SPECIFIC METHODS
+
+  // Get aurora-themed products
+  Future<List<PrintProduct>> getAuroraProducts() async {
+    final allProducts = await getProducts();
+
+    // Filter for products suitable for aurora photos
+    return allProducts.where((product) =>
+    product.type == 'poster' ||
+        product.type == 'canvas' ||
+        product.type == 'mug' ||
+        product.type == 'phone-case' ||
+        product.type == 't-shirt'
+    ).toList();
+  }
+
+  // Create aurora photo print package
+  Future<Map<String, dynamic>> createAuroraPackage({
+    required String photoUrl,
+    required String customerName,
+    required String tourDate,
+    required Map<String, dynamic> address,
+  }) async {
+    try {
+      // Get recommended products for aurora photos
+      final products = await getAuroraProducts();
+
+      if (products.isEmpty) {
+        return {};
       }
 
-      // Fallback shipping cost
-      return 15.99;
+      // Find poster and canvas products
+      final posters = products.where((p) => p.type == 'poster').toList();
+      final canvases = products.where((p) => p.type == 'canvas').toList();
+
+      final result = <String, dynamic>{};
+
+      if (posters.isNotEmpty) {
+        final poster = posters.first;
+        final posterMockup = await generateMockup(
+          productId: poster.id,
+          variantId: poster.variants.isNotEmpty ? poster.variants.first.id : 0,
+          imageUrl: photoUrl,
+        );
+
+        result['poster'] = {
+          'product': poster,
+          'mockup': posterMockup,
+        };
+      }
+
+      if (canvases.isNotEmpty) {
+        final canvas = canvases.first;
+        final canvasMockup = await generateMockup(
+          productId: canvas.id,
+          variantId: canvas.variants.isNotEmpty ? canvas.variants.first.id : 0,
+          imageUrl: photoUrl,
+        );
+
+        result['canvas'] = {
+          'product': canvas,
+          'mockup': canvasMockup,
+        };
+      }
+
+      result['metadata'] = {
+        'customerName': customerName,
+        'tourDate': tourDate,
+        'photoUrl': photoUrl,
+      };
+
+      return result;
     } catch (e) {
-      // Fallback shipping cost
-      return 15.99;
+      print('Error creating aurora package: $e');
+      return {};
     }
   }
 
-  /// Get request headers for Printful API
-  static Map<String, String> _getHeaders() {
-    return {
-      'Authorization': 'Basic ${base64Encode(utf8.encode(_apiKey))}',
-      'Content-Type': 'application/json',
-      'X-PF-Store-Id': 'YOUR_STORE_ID', // If using store-specific API
-    };
-  }
+  // MOCK DATA FOR DEVELOPMENT
 
-  /// Calculate subtotal for items
-  static double _calculateSubtotal(List<OrderItem> items) {
-    return items.fold(0.0, (sum, item) => sum + (item.price * item.quantity));
-  }
-
-  /// Calculate shipping cost (simplified)
-  static double _calculateShipping(List<OrderItem> items, ShippingAddress address) {
-    // Simplified shipping calculation
-    // In production, use Printful's shipping rates API
-    final itemCount = items.fold<int>(0, (sum, item) => sum + item.quantity);
-
-    if (address.countryCode == 'US') {
-      return itemCount <= 3 ? 4.99 : 7.99;
-    } else {
-      return itemCount <= 3 ? 9.99 : 15.99;
-    }
-  }
-
-  /// Calculate tax (simplified)
-  static double _calculateTax(List<OrderItem> items, ShippingAddress address) {
-    // Simplified tax calculation
-    // In production, use proper tax calculation service
-    final subtotal = _calculateSubtotal(items);
-
-    // US sales tax (varies by state)
-    if (address.countryCode == 'US') {
-      return subtotal * 0.08; // 8% average
-    }
-
-    // VAT for EU countries
-    if (_isEUCountry(address.countryCode)) {
-      return subtotal * 0.20; // 20% average VAT
-    }
-
-    return 0.0; // No tax for other countries
-  }
-
-  /// Check if country is in EU (simplified)
-  static bool _isEUCountry(String countryCode) {
-    const euCountries = ['DE', 'FR', 'IT', 'ES', 'NL', 'BE', 'AT', 'PT', 'IE', 'FI', 'SE', 'DK'];
-    return euCountries.contains(countryCode);
-  }
-
-  /// Get popular aurora-themed products
-  static List<int> getAuroraProducts() {
+  List<PrintProduct> _getMockProducts() {
     return [
-      71,   // Unisex Heavy Cotton Tee
-      146,  // Canvas Print (16×20″)
-      19,   // Mug
-      45,   // iPhone Case
-      116,  // Throw Pillow
-      142,  // Poster (18×24″)
-      369,  // Framed Print
-      287,  // Photo book
+      PrintProduct(
+        id: 1,
+        name: 'Aurora Poster',
+        description: 'High-quality poster perfect for aurora photos',
+        category: 'poster',
+        imageUrls: ['https://via.placeholder.com/400x600/0f1419/ffffff?text=Aurora+Poster'],
+        variants: [
+          ProductVariant(
+            id: 101,
+            productId: 1,
+            name: '18×24 inches',
+            size: '18×24"',
+            color: 'White',
+            colorCode: '#FFFFFF',
+            price: 25.00,
+            currency: 'USD',
+            isAvailable: true,
+            imageUrl: 'https://via.placeholder.com/400x600/0f1419/ffffff?text=Aurora+Poster',
+          ),
+          ProductVariant(
+            id: 102,
+            productId: 1,
+            name: '24×36 inches',
+            size: '24×36"',
+            color: 'White',
+            colorCode: '#FFFFFF',
+            price: 35.00,
+            currency: 'USD',
+            isAvailable: true,
+            imageUrl: 'https://via.placeholder.com/400x600/0f1419/ffffff?text=Aurora+Poster',
+          ),
+        ],
+        printAreas: {},
+        isAvailable: true,
+      ),
+      PrintProduct(
+        id: 2,
+        name: 'Aurora Canvas',
+        description: 'Premium canvas print for your aurora memories',
+        category: 'canvas',
+        imageUrls: ['https://via.placeholder.com/400x600/0f1419/ffffff?text=Aurora+Canvas'],
+        variants: [
+          ProductVariant(
+            id: 201,
+            productId: 2,
+            name: '16×20 inches',
+            size: '16×20"',
+            color: 'White',
+            colorCode: '#FFFFFF',
+            price: 45.00,
+            currency: 'USD',
+            isAvailable: true,
+            imageUrl: 'https://via.placeholder.com/400x600/0f1419/ffffff?text=Aurora+Canvas',
+          ),
+          ProductVariant(
+            id: 202,
+            productId: 2,
+            name: '20×30 inches',
+            size: '20×30"',
+            color: 'White',
+            colorCode: '#FFFFFF',
+            price: 65.00,
+            currency: 'USD',
+            isAvailable: true,
+            imageUrl: 'https://via.placeholder.com/400x600/0f1419/ffffff?text=Aurora+Canvas',
+          ),
+        ],
+        printAreas: {},
+        isAvailable: true,
+      ),
+      PrintProduct(
+        id: 3,
+        name: 'Aurora Mug',
+        description: 'Start your day with aurora magic',
+        category: 'mug',
+        imageUrls: ['https://via.placeholder.com/400x400/0f1419/ffffff?text=Aurora+Mug'],
+        variants: [
+          ProductVariant(
+            id: 301,
+            productId: 3,
+            name: '11oz Ceramic Mug',
+            size: '11oz',
+            color: 'White',
+            colorCode: '#FFFFFF',
+            price: 15.00,
+            currency: 'USD',
+            isAvailable: true,
+            imageUrl: 'https://via.placeholder.com/400x400/0f1419/ffffff?text=Aurora+Mug',
+          ),
+          ProductVariant(
+            id: 302,
+            productId: 3,
+            name: '15oz Ceramic Mug',
+            size: '15oz',
+            color: 'White',
+            colorCode: '#FFFFFF',
+            price: 18.00,
+            currency: 'USD',
+            isAvailable: true,
+            imageUrl: 'https://via.placeholder.com/400x400/0f1419/ffffff?text=Aurora+Mug',
+          ),
+        ],
+        printAreas: {},
+        isAvailable: true,
+      ),
     ];
   }
 
-  /// Get product recommendations based on photo
-  static List<int> getRecommendedProducts(String photoType) {
-    switch (photoType.toLowerCase()) {
-      case 'landscape':
-        return [146, 142, 369]; // Canvas, Poster, Framed Print
-      case 'portrait':
-        return [71, 19, 45]; // T-shirt, Mug, Phone Case
-      default:
-        return getAuroraProducts();
+  List<ShippingRate> _getMockShippingRates() {
+    return [
+      ShippingRate(
+        id: 'standard',
+        name: 'Standard Shipping',
+        rate: 5.99,
+        currency: 'USD',
+        minDeliveryDays: 7,
+        maxDeliveryDays: 14,
+      ),
+      ShippingRate(
+        id: 'express',
+        name: 'Express Shipping',
+        rate: 12.99,
+        currency: 'USD',
+        minDeliveryDays: 3,
+        maxDeliveryDays: 7,
+      ),
+    ];
+  }
+
+  // UTILITY METHODS
+
+  // Upload file to Printful for printing
+  Future<String?> uploadFile(File file) async {
+    try {
+      final request = http.MultipartRequest(
+        'POST',
+        Uri.parse('$baseUrl/files'),
+      );
+
+      request.headers.addAll(headers);
+      request.files.add(await http.MultipartFile.fromPath('file', file.path));
+
+      final response = await request.send();
+
+      if (response.statusCode == 200) {
+        final responseData = await response.stream.bytesToString();
+        final data = json.decode(responseData);
+        return data['result']['id'];
+      } else {
+        throw Exception('Failed to upload file: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error uploading file: $e');
+      return null;
     }
+  }
+
+  // Get product pricing with quantity discounts
+  Future<Map<String, dynamic>> getProductPricing({
+    required int variantId,
+    required int quantity,
+  }) async {
+    try {
+      final response = await http.get(
+        Uri.parse('$baseUrl/products/variant/$variantId'),
+        headers: headers,
+      );
+
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final variant = data['result']['variant'];
+
+        return {
+          'retail_price': variant['retail_price'],
+          'price': variant['price'],
+          'currency': variant['currency'],
+          'quantity_discount': _calculateQuantityDiscount(quantity),
+        };
+      } else {
+        throw Exception('Failed to get pricing: ${response.statusCode}');
+      }
+    } catch (e) {
+      print('Error getting pricing: $e');
+      return {};
+    }
+  }
+
+  double _calculateQuantityDiscount(int quantity) {
+    if (quantity >= 10) return 0.15; // 15% discount
+    if (quantity >= 5) return 0.10;  // 10% discount
+    if (quantity >= 3) return 0.05;  // 5% discount
+    return 0.0; // No discount
+  }
+}
+
+// Supporting classes for shipping rates
+class ShippingRate {
+  final String id;
+  final String name;
+  final double rate;
+  final String currency;
+  final int minDeliveryDays;
+  final int maxDeliveryDays;
+
+  ShippingRate({
+    required this.id,
+    required this.name,
+    required this.rate,
+    required this.currency,
+    required this.minDeliveryDays,
+    required this.maxDeliveryDays,
+  });
+
+  factory ShippingRate.fromJson(Map<String, dynamic> json) {
+    return ShippingRate(
+      id: json['id'],
+      name: json['name'],
+      rate: (json['rate'] as num).toDouble(),
+      currency: json['currency'],
+      minDeliveryDays: json['minDeliveryDays'] ?? 7,
+      maxDeliveryDays: json['maxDeliveryDays'] ?? 14,
+    );
   }
 }

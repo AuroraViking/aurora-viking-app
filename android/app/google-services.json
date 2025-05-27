@@ -1,0 +1,29 @@
+{
+  "project_info": {
+    "project_number": "1099021548072",
+    "project_id": "aurora-viking-app",
+    "storage_bucket": "aurora-viking-app.firebasestorage.app"
+  },
+  "client": [
+    {
+      "client_info": {
+        "mobilesdk_app_id": "1:1099021548072:android:abdcb84b6defa64100d31d",
+        "android_client_info": {
+          "package_name": "com.example.aurora_viking_app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyArCh7e0p46r-ltBRuV08vYxha0eo7DOZo"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    }
+  ],
+  "configuration_version": "1"
+}
