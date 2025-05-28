@@ -9,6 +9,7 @@ import '../services/firebase_service.dart';
 import '../widgets/sighting_card.dart';
 import '../widgets/aurora_map.dart';
 import '../widgets/sign_in_widget.dart';
+import '../screens/spot_aurora_screen.dart';
 
 class AuroraAlertsTab extends StatefulWidget {
   const AuroraAlertsTab({super.key});
@@ -440,6 +441,17 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
               ],
             ),
           ),
+          floatingActionButton: _firebaseService.isAuthenticated
+              ? FloatingActionButton.extended(
+                  onPressed: _navigateToSpotAurora,
+                  backgroundColor: Colors.tealAccent,
+                  icon: const Icon(Icons.camera_alt, color: Colors.black),
+                  label: const Text(
+                    'Spot Aurora',
+                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
+                  ),
+                )
+              : null,
         );
       },
     );
@@ -1179,5 +1191,17 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
       case 5: return Colors.amber;
       default: return Colors.grey;
     }
+  }
+
+  void _navigateToSpotAurora() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => const SpotAuroraScreen(
+          currentBzH: 0.0, // You should get this from your aurora data service
+          currentKp: 0.0,  // You should get this from your aurora data service
+        ),
+      ),
+    );
   }
 }

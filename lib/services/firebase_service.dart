@@ -18,46 +18,69 @@ class FirebaseService {
   FirebaseStorage get storage => FirebaseStorage.instance;
   FirebaseMessaging get messaging => FirebaseMessaging.instance;
 
-  // Current user
+  // Current user properties
   User? get currentUser => auth.currentUser;
-  bool get isAuthenticated => currentUser != null;
+  bool get isAuthenticated => currentUser != null && !currentUser!.isAnonymous;
+  bool get isGuest => currentUser != null && currentUser!.isAnonymous;
+  String get userDisplayName {
+    if (currentUser == null) return 'Guest';
+    if (isGuest) return 'Guest';
+    return currentUser!.displayName ?? currentUser!.email ?? 'User';
+  }
 
-  // Initialize Firebase
+  // Initialize Firebase with automatic guest sign-in
   static Future<void> initialize() async {
     await Firebase.initializeApp();
-    await FirebaseService()._setupMessaging();
+
+    // Automatically sign in as guest if no user is signed in
+    final firebaseService = FirebaseService();
+    if (firebaseService.currentUser == null) {
+      await firebaseService.signInAsGuest();
+    }
+
+    await firebaseService._setupMessaging();
+    print('✅ Firebase initialized - User: ${firebaseService.userDisplayName}');
   }
 
   // AUTHENTICATION METHODS
 
-  // Anonymous sign in for guest users
-  Future<UserCredential?> signInAnonymously() async {
+  // Sign in as guest (replaces anonymous)
+  Future<UserCredential?> signInAsGuest() async {
     try {
       final credential = await auth.signInAnonymously();
-      if (credential.user != null) {
-        await _ensureUserProfileExists();
-      }
+      print('✅ Signed in as guest');
       return credential;
     } catch (e) {
-      print('Anonymous sign in failed: $e');
+      print('❌ Guest sign in failed: $e');
       return null;
     }
   }
 
-  // Email/password registration
+  // Email/password registration - converts guest to full user
   Future<UserCredential?> registerWithEmail(String email, String password, String displayName) async {
     try {
-      final credential = await auth.createUserWithEmailAndPassword(
-        email: email,
-        password: password,
-      );
+      UserCredential credential;
 
+      // If user is currently a guest, link the account
+      if (isGuest) {
+        final emailCredential = EmailAuthProvider.credential(email: email, password: password);
+        credential = await currentUser!.linkWithCredential(emailCredential);
+        print('✅ Guest account converted to full user');
+      } else {
+        // Create new account
+        credential = await auth.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
+      }
+
+      // Update display name
       await credential.user?.updateDisplayName(displayName);
       await _createUserProfile(credential.user!);
 
       return credential;
     } catch (e) {
-      print('Registration failed: $e');
+      print('❌ Registration failed: $e');
       return null;
     }
   }
@@ -65,23 +88,26 @@ class FirebaseService {
   // Email/password sign in
   Future<UserCredential?> signInWithEmail(String email, String password) async {
     try {
-      final credential = await auth.signInWithEmailAndPassword(
+      return await auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
-      if (credential.user != null) {
-        await _ensureUserProfileExists();
-      }
-      return credential;
     } catch (e) {
-      print('Sign in failed: $e');
+      print('❌ Sign in failed: $e');
       return null;
     }
   }
 
-  // Sign out
+  // Sign out - returns to guest mode
   Future<void> signOut() async {
-    await auth.signOut();
+    try {
+      await auth.signOut();
+      // Automatically sign back in as guest
+      await signInAsGuest();
+      print('✅ Signed out and returned to guest mode');
+    } catch (e) {
+      print('❌ Sign out failed: $e');
+    }
   }
 
   // Create user profile in Firestore
@@ -91,32 +117,15 @@ class FirebaseService {
         'email': user.email,
         'displayName': user.displayName,
         'createdAt': FieldValue.serverTimestamp(),
-        'isAnonymous': user.isAnonymous,
+        'isGuest': user.isAnonymous,
         'auroraSpottingCount': 0,
         'verificationCount': 0,
-      });
-      print('✅ User profile created for ${user.uid}');
+        'lastActive': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      print('✅ User profile created/updated');
     } catch (e) {
       print('❌ Failed to create user profile: $e');
-    }
-  }
-
-  // Add this helper method to ensure user profile exists
-  Future<void> _ensureUserProfileExists() async {
-    if (!isAuthenticated) return;
-
-    try {
-      final userDoc = await firestore.collection('users').doc(currentUser!.uid).get();
-
-      if (!userDoc.exists) {
-        print('👤 Creating user profile...');
-        await _createUserProfile(currentUser!);
-        print('✅ User profile created');
-      } else {
-        print('👤 User profile already exists');
-      }
-    } catch (e) {
-      print('⚠️ Error ensuring user profile exists: $e');
     }
   }
 
@@ -135,28 +144,22 @@ class FirebaseService {
     required double kp,
     required double solarWindSpeed,
   }) async {
-    if (!isAuthenticated) return null;
+    if (currentUser == null) {
+      await signInAsGuest();
+    }
 
     try {
-      print('🔄 Starting aurora sighting submission...');
-
-      // Create user profile if it doesn't exist (fix for the document not found error)
-      await _ensureUserProfileExists();
-
       String? photoUrl;
 
       // Upload photo if provided
       if (photoFile != null || photoBytes != null) {
-        print('📸 Uploading photo...');
         photoUrl = await _uploadAuroraPhoto(photoFile, photoBytes);
-        print('✅ Photo uploaded: $photoUrl');
       }
 
-      print('💾 Creating sighting document...');
       // Create sighting document
       final sightingRef = await firestore.collection('aurora_sightings').add({
         'userId': currentUser!.uid,
-        'userDisplayName': currentUser!.displayName ?? 'Aurora Hunter',
+        'userDisplayName': userDisplayName,
         'location': {
           'latitude': latitude,
           'longitude': longitude,
@@ -176,67 +179,18 @@ class FirebaseService {
         'reportCount': 0,
       });
 
-      print('✅ Sighting document created with ID: ${sightingRef.id}');
-
-      // Save user photo if one was taken
-      if (photoUrl != null) {
-        print('💾 Saving user photo...');
-        await _saveUserPhoto(
-          sightingId: sightingRef.id,
-          photoUrl: photoUrl,
-          locationName: address,
-          intensity: intensity,
-          metadata: {
-            'bzH': bzH,
-            'kp': kp,
-            'solarWindSpeed': solarWindSpeed,
-            'description': description,
-          },
-        );
-        print('✅ User photo saved');
+      // Update user's sighting count (only for authenticated users)
+      if (isAuthenticated) {
+        await firestore.collection('users').doc(currentUser!.uid).update({
+          'auroraSpottingCount': FieldValue.increment(1),
+          'lastActive': FieldValue.serverTimestamp(),
+        });
       }
 
-      // Update user's sighting count (now safe because profile exists)
-      print('📊 Updating user stats...');
-      await firestore.collection('users').doc(currentUser!.uid).update({
-        'auroraSpottingCount': FieldValue.increment(1),
-      });
-      print('✅ User stats updated');
-
-      print('🎉 Aurora sighting submission completed successfully!');
       return sightingRef.id;
     } catch (e) {
       print('❌ Failed to submit aurora sighting: $e');
       return null;
-    }
-  }
-
-  // Save user photo to separate collection for print shop access
-  Future<void> _saveUserPhoto({
-    required String sightingId,
-    required String photoUrl,
-    required String locationName,
-    required int intensity,
-    required Map<String, dynamic> metadata,
-  }) async {
-    try {
-      await firestore.collection('user_aurora_photos').add({
-        'userId': currentUser!.uid,
-        'userName': currentUser!.displayName ?? 'Aurora Hunter',
-        'sightingId': sightingId,
-        'photoUrl': photoUrl,
-        'thumbnailUrl': photoUrl, // Same for now, could generate thumbnail later
-        'capturedAt': FieldValue.serverTimestamp(),
-        'locationName': locationName,
-        'intensity': intensity,
-        'isPublic': true,
-        'isAvailableForPrint': true,
-        'printCount': 0,
-        'metadata': metadata,
-      });
-    } catch (e) {
-      print('Failed to save user photo: $e');
-      // Don't throw - this is secondary to the main sighting submission
     }
   }
 
@@ -288,7 +242,7 @@ class FirebaseService {
 
   // Verify aurora sighting
   Future<bool> verifyAuroraSighting(String sightingId) async {
-    if (!isAuthenticated) return false;
+    if (currentUser == null) return false;
 
     try {
       final sightingRef = firestore.collection('aurora_sightings').doc(sightingId);
@@ -306,12 +260,23 @@ class FirebaseService {
             'verifications': verifications,
             'isVerified': verifications.length >= 3,
           });
+
+          // Update user's verification count (only for authenticated users)
+          if (isAuthenticated) {
+            transaction.update(
+              firestore.collection('users').doc(currentUser!.uid),
+              {
+                'verificationCount': FieldValue.increment(1),
+                'lastActive': FieldValue.serverTimestamp(),
+              },
+            );
+          }
         }
       });
 
       return true;
     } catch (e) {
-      print('Failed to verify sighting: $e');
+      print('❌ Failed to verify sighting: $e');
       return false;
     }
   }
@@ -337,7 +302,7 @@ class FirebaseService {
       final snapshot = await uploadTask;
       return await snapshot.ref.getDownloadURL();
     } catch (e) {
-      print('Failed to upload photo: $e');
+      print('❌ Failed to upload photo: $e');
       return null;
     }
   }
@@ -354,7 +319,7 @@ class FirebaseService {
       final snapshot = await uploadTask;
       return await snapshot.ref.getDownloadURL();
     } catch (e) {
-      print('Failed to upload tour photo: $e');
+      print('❌ Failed to upload tour photo: $e');
       return null;
     }
   }
@@ -373,7 +338,7 @@ class FirebaseService {
 
       return urls;
     } catch (e) {
-      print('Failed to get tour photos: $e');
+      print('❌ Failed to get tour photos: $e');
       return [];
     }
   }
@@ -382,40 +347,33 @@ class FirebaseService {
 
   // Setup FCM
   Future<void> _setupMessaging() async {
-    try {
-      // Request permission for notifications
-      final settings = await messaging.requestPermission(
-        alert: true,
-        badge: true,
-        sound: true,
-        provisional: false,
-      );
+    // Request permission for notifications
+    final settings = await messaging.requestPermission(
+      alert: true,
+      badge: true,
+      sound: true,
+      provisional: false,
+    );
 
-      if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-        print('User granted permission for notifications');
-      }
-
-      // Get FCM token
-      final token = await messaging.getToken();
-      print('FCM Token: $token');
-
-      // Handle foreground messages
-      FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-        print('Received foreground message: ${message.notification?.title}');
-        // Handle the message (show local notification)
-      });
-    } catch (e) {
-      print('Error setting up messaging: $e');
+    if (settings.authorizationStatus == AuthorizationStatus.authorized) {
+      print('✅ User granted permission for notifications');
     }
+
+    // Get FCM token
+    final token = await messaging.getToken();
+    print('📱 FCM Token: $token');
+
+    // Handle foreground messages
+    FirebaseMessaging.onMessage.listen((RemoteMessage message) {
+      print('📨 Received foreground message: ${message.notification?.title}');
+      // Handle the message (show local notification)
+    });
   }
 
   // Subscribe to aurora alerts for location
   Future<void> subscribeToAuroraAlerts(String locationKey) async {
-    try {
-      await messaging.subscribeToTopic('aurora_alerts_$locationKey');
-    } catch (e) {
-      print('Failed to subscribe to aurora alerts: $e');
-    }
+    await messaging.subscribeToTopic('aurora_alerts_$locationKey');
+    print('🔔 Subscribed to aurora alerts for $locationKey');
   }
 
   // Send aurora alert to topic
@@ -425,88 +383,15 @@ class FirebaseService {
     required String body,
     required Map<String, dynamic> data,
   }) async {
-    try {
-      // This would typically be done from a cloud function or admin SDK
-      // For now, we'll store alert data in Firestore
-      await firestore.collection('aurora_alerts').add({
-        'locationKey': locationKey,
-        'title': title,
-        'body': body,
-        'data': data,
-        'timestamp': FieldValue.serverTimestamp(),
-      });
-    } catch (e) {
-      print('Failed to send aurora alert: $e');
-    }
-  }
-
-  // USER PHOTOS METHODS
-
-  // Get user's aurora photos
-  Stream<QuerySnapshot> getUserPhotosStream() {
-    if (!isAuthenticated) {
-      // Return empty stream if not authenticated
-      return Stream.value(
-          QuerySnapshot as QuerySnapshot
-      );
-    }
-
-    return firestore
-        .collection('user_aurora_photos')
-        .where('userId', isEqualTo: currentUser!.uid)
-        .orderBy('capturedAt', descending: true)
-        .snapshots();
-  }
-
-  // Update photo privacy settings
-  Future<void> updatePhotoPrivacy(String photoId, bool isPublic) async {
-    if (!isAuthenticated) return;
-
-    try {
-      await firestore
-          .collection('user_aurora_photos')
-          .doc(photoId)
-          .update({'isPublic': isPublic});
-    } catch (e) {
-      print('Failed to update photo privacy: $e');
-    }
-  }
-
-  // Delete user photo
-  Future<void> deleteUserPhoto(String photoId) async {
-    if (!isAuthenticated) return;
-
-    try {
-      // Get photo to verify ownership
-      final photoDoc = await firestore
-          .collection('user_aurora_photos')
-          .doc(photoId)
-          .get();
-
-      if (photoDoc.exists) {
-        final data = photoDoc.data() as Map<String, dynamic>;
-        if (data['userId'] == currentUser!.uid) {
-          // Delete from Storage if needed
-          final photoUrl = data['photoUrl'] as String?;
-          if (photoUrl != null) {
-            try {
-              final ref = storage.refFromURL(photoUrl);
-              await ref.delete();
-            } catch (e) {
-              print('Failed to delete from storage: $e');
-            }
-          }
-
-          // Delete from Firestore
-          await firestore
-              .collection('user_aurora_photos')
-              .doc(photoId)
-              .delete();
-        }
-      }
-    } catch (e) {
-      print('Failed to delete user photo: $e');
-    }
+    // This would typically be done from a cloud function or admin SDK
+    // For now, we'll store alert data in Firestore
+    await firestore.collection('aurora_alerts').add({
+      'locationKey': locationKey,
+      'title': title,
+      'body': body,
+      'data': data,
+      'timestamp': FieldValue.serverTimestamp(),
+    });
   }
 
   // UTILITY METHODS
@@ -529,5 +414,23 @@ class FirebaseService {
 
   double _degreesToRadians(double degrees) {
     return degrees * (math.pi / 180);
+  }
+
+  // Get user's aurora photos stream (updated to match index)
+  Stream<QuerySnapshot> getUserPhotoStream({
+    String? userId,
+    int limit = 20,
+  }) {
+    final targetUserId = userId ?? currentUser?.uid;
+    if (targetUserId == null) {
+      return Stream.empty();
+    }
+
+    return firestore
+        .collection('user_aurora_photos')
+        .where('userId', isEqualTo: targetUserId)
+        .orderBy('capturedAt', descending: true)
+        .limit(limit)
+        .snapshots();
   }
 }

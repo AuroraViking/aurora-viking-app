@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../services/solar_wind_service.dart';
 import '../services/kp_service.dart';
+import '../services/kp_forecast_service.dart';
 import '../services/aurora_message_service.dart';
 import '../widgets/forecast/forecast_chart_widget.dart';
 
@@ -17,7 +18,7 @@ class _ForecastTabState extends State<ForecastTab> {
   double kp = 0.0;
   double speed = 0.0;
   double density = 0.0;
-  double bt = 0.0;
+  List<KpForecastDay> kpForecast = [];
   bool isLoading = true;
 
   @override
@@ -30,6 +31,7 @@ class _ForecastTabState extends State<ForecastTab> {
     final swData = await SolarWindService.fetchData();
     final bzRes = await SolarWindService.fetchBzHistory();
     final kpIndex = await KpService.fetchCurrentKp();
+    final forecast = await KpForecastService.fetchKpForecast();
 
     setState(() {
       bzValues = bzRes.bzValues;
@@ -37,7 +39,7 @@ class _ForecastTabState extends State<ForecastTab> {
       kp = kpIndex;
       speed = swData.speed;
       density = swData.density;
-      bt = swData.bt ?? 0;
+      kpForecast = forecast;
       isLoading = false;
     });
   }
@@ -182,7 +184,7 @@ class _ForecastTabState extends State<ForecastTab> {
                         const SizedBox(height: 8),
                         _buildDataRow('Kp Index', kp.toStringAsFixed(1), Colors.white),
                         const SizedBox(height: 8),
-                        _buildDataRow('Speed', '${speed.toInt()} m/s', Colors.white70),
+                        _buildDataRow('Speed', '${speed.toInt()} km/s', Colors.white70),
                       ],
                     ),
                   ),
@@ -193,8 +195,6 @@ class _ForecastTabState extends State<ForecastTab> {
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
                         _buildDataRow('Density', '${density.toStringAsFixed(1)} /cm³', Colors.white70),
-                        const SizedBox(height: 8),
-                        _buildDataRow('Bt Total', '${bt.toStringAsFixed(1)} nT', Colors.white70),
                         const SizedBox(height: 8),
                         Row(
                           children: [
@@ -228,13 +228,182 @@ class _ForecastTabState extends State<ForecastTab> {
                 kp: kp,
                 speed: speed,
                 density: density,
-                bt: bt,
+              ),
+            ),
+
+            const SizedBox(height: 20),
+
+            // 5-Day Kp Forecast Section
+            Container(
+              margin: const EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Row(
+                    children: [
+                      Icon(Icons.schedule, color: Colors.tealAccent, size: 20),
+                      const SizedBox(width: 8),
+                      Text(
+                        '5-Day Kp Forecast',
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                          color: Colors.tealAccent,
+                          shadows: [Shadow(color: Colors.tealAccent, blurRadius: 8)],
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 12),
+                  _buildKpForecastList(),
+                ],
               ),
             ),
 
             const SizedBox(height: 20), // Bottom padding for scroll
           ],
         ),
+      ),
+    );
+  }
+
+  Widget _buildKpForecastList() {
+    if (kpForecast.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Center(
+          child: Text(
+            'Forecast data unavailable',
+            style: TextStyle(color: Colors.white54),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: kpForecast.map((forecast) => _buildKpForecastCard(forecast)).toList(),
+    );
+  }
+
+  Widget _buildKpForecastCard(KpForecastDay forecast) {
+    return Container(
+      margin: const EdgeInsets.only(bottom: 8),
+      padding: const EdgeInsets.all(12),
+      decoration: BoxDecoration(
+        gradient: LinearGradient(
+          begin: Alignment.centerLeft,
+          end: Alignment.centerRight,
+          colors: [
+            forecast.activityColor.withOpacity(0.15),
+            Colors.black.withOpacity(0.8),
+          ],
+        ),
+        borderRadius: BorderRadius.circular(12),
+        border: Border.all(
+          color: forecast.activityColor.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: Row(
+        children: [
+          // Date
+          SizedBox(
+            width: 80,
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  forecast.formattedDate,
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  forecast.date.day == DateTime.now().day ? 'Today' : '',
+                  style: TextStyle(
+                    color: Colors.tealAccent,
+                    fontSize: 11,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Kp Value
+          Container(
+            width: 60,
+            height: 40,
+            decoration: BoxDecoration(
+              color: forecast.activityColor.withOpacity(0.2),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: forecast.activityColor.withOpacity(0.5),
+                width: 1,
+              ),
+            ),
+            child: Center(
+              child: Text(
+                'Kp ${forecast.expectedKp.toStringAsFixed(1)}',
+                style: TextStyle(
+                  color: forecast.activityColor,
+                  fontSize: 12,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ),
+
+          const SizedBox(width: 12),
+
+          // Activity Description
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  forecast.description,
+                  style: TextStyle(
+                    color: forecast.activityColor,
+                    fontSize: 14,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                Text(
+                  'Confidence: ${forecast.confidenceLevel}',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 11,
+                  ),
+                ),
+              ],
+            ),
+          ),
+
+          // Activity Indicator
+          Container(
+            width: 8,
+            height: 30,
+            decoration: BoxDecoration(
+              color: forecast.activityColor,
+              borderRadius: BorderRadius.circular(4),
+              boxShadow: [
+                BoxShadow(
+                  color: forecast.activityColor.withOpacity(0.5),
+                  blurRadius: 4,
+                  spreadRadius: 1,
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }

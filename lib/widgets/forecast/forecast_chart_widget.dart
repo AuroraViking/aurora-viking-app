@@ -8,7 +8,6 @@ class ForecastChartWidget extends StatelessWidget {
   final double kp;
   final double speed;
   final double density;
-  final double bt;
 
   const ForecastChartWidget({
     super.key,
@@ -17,7 +16,6 @@ class ForecastChartWidget extends StatelessWidget {
     required this.kp,
     required this.speed,
     required this.density,
-    required this.bt,
   });
 
   @override
@@ -309,7 +307,7 @@ class ForecastChartWidget extends StatelessWidget {
                         ),
                       ),
                       Text(
-                        '@${speed.toInt()}m/s',
+                        '@${speed.toInt()}km/s',
                         style: TextStyle(
                           color: Colors.white70,
                           fontSize: 9,
@@ -328,80 +326,18 @@ class ForecastChartWidget extends StatelessWidget {
   int? _calculateEarthImpactIndex() {
     if (speed <= 0 || times.isEmpty) return null;
 
-    // Distance from L1 to Earth: ~1.5 million km = 1,500,000,000 meters
-    // Wait, let me double-check this calculation...
+    // Simple formula: 1,500,000 / speed / 60 = minutes
+    const double l1ToEarthKm = 1500000.0; // 1.5 million km
+    final delayMinutes = l1ToEarthKm / speed / 60.0;
 
-    // L1 Lagrange point is approximately 1.5 million kilometers from Earth
-    // 1.5 million km = 1,500,000 km = 1,500,000 * 1000 m = 1,500,000,000 m
-
-    // But let me verify with a known example:
-    // Typical solar wind speed: 400 km/s = 400,000 m/s
-    // Expected transit time: should be around 60-90 minutes
-
-    // Let's work backwards: if 400 km/s should give ~60 minutes
-    // Then distance = speed × time = 400 km/s × 3600 s = 1,440,000 km ≈ 1.5M km ✓
-
-    // AHA! The issue is the speed units!
-    // Your speed data is in m/s, but solar wind speeds are typically 300-800 km/s
-    // So 400 m/s is way too slow - it should be more like 400,000 m/s
-
-    const double l1ToEarthMeters = 1500000000.0; // 1.5 million km in meters
-
-    // Let's check if speed needs unit conversion
-    // If speed is actually in km/s but labeled as m/s:
-    final speedInMeterPerSec = speed;
-    final speedInKmPerSec = speed / 1000.0;
-
-    // Calculate both possibilities
-    final delaySecondsIfMperS = l1ToEarthMeters / speedInMeterPerSec;
-    final delaySecondsIfKmperS = l1ToEarthMeters / (speedInKmPerSec * 1000);
-
-    final delayMinutesIfMperS = delaySecondsIfMperS / 60.0;
-    final delayMinutesIfKmperS = delaySecondsIfKmperS / 60.0;
-
-    print('🌍 DEBUGGING Transit Time Calculation:');
-    print('   Raw speed value: ${speed}');
-    print('   If speed is m/s: ${delayMinutesIfMperS.toStringAsFixed(1)} minutes');
-    print('   If speed is km/s: ${delayMinutesIfKmperS.toStringAsFixed(1)} minutes');
-
-    // Choose the realistic delay (should be 30-120 minutes)
-    double delayMinutes;
-    if (delayMinutesIfKmperS >= 30 && delayMinutesIfKmperS <= 120) {
-      delayMinutes = delayMinutesIfKmperS;
-      print('   Using km/s interpretation: ${delayMinutes.toStringAsFixed(1)} minutes ✓');
-    } else if (delayMinutesIfMperS >= 30 && delayMinutesIfMperS <= 120) {
-      delayMinutes = delayMinutesIfMperS;
-      print('   Using m/s interpretation: ${delayMinutes.toStringAsFixed(1)} minutes ✓');
-    } else {
-      // If neither makes sense, use a fixed reasonable delay
-      delayMinutes = 60.0;
-      print('   Neither makes sense, using default: 60 minutes');
-    }
-
-    // Now calculate the index properly
-    // Assume 1-minute resolution for NOAA data
+    // Calculate index (assuming 1-minute data resolution)
     final dataPointsBack = delayMinutes.round();
     final mostRecentIndex = times.length - 1;
     final earthImpactIndex = mostRecentIndex - dataPointsBack;
 
-    print('   Final calculation:');
-    print('     Delay: ${delayMinutes.toStringAsFixed(1)} minutes');
-    print('     Going back: $dataPointsBack data points');
-    print('     Index: $earthImpactIndex');
-
     // Ensure index is in bounds
-    if (earthImpactIndex < 0) {
-      print('     Clamped to start (0)');
-      return 0;
-    }
-    if (earthImpactIndex >= times.length) {
-      print('     Clamped to end (${times.length - 1})');
-      return times.length - 1;
-    }
-
-    if (earthImpactIndex < times.length) {
-      print('     Final position: ${times[earthImpactIndex]}');
-    }
+    if (earthImpactIndex < 0) return 0;
+    if (earthImpactIndex >= times.length) return times.length - 1;
 
     return earthImpactIndex;
   }
@@ -409,28 +345,9 @@ class ForecastChartWidget extends StatelessWidget {
   double _getEarthImpactDelay() {
     if (speed <= 0) return 0.0;
 
-    // Distance: 1.5 million km = 1,500,000,000 meters
-    const double l1ToEarthMeters = 1500000000.0;
-
-    // Check both unit possibilities
-    final speedInMeterPerSec = speed;
-    final speedInKmPerSec = speed / 1000.0;
-
-    // Calculate both possibilities
-    final delaySecondsIfMperS = l1ToEarthMeters / speedInMeterPerSec;
-    final delaySecondsIfKmperS = l1ToEarthMeters / (speedInKmPerSec * 1000);
-
-    final delayMinutesIfMperS = delaySecondsIfMperS / 60.0;
-    final delayMinutesIfKmperS = delaySecondsIfKmperS / 60.0;
-
-    // Choose the realistic delay (should be 30-120 minutes)
-    if (delayMinutesIfKmperS >= 30 && delayMinutesIfKmperS <= 120) {
-      return delayMinutesIfKmperS; // Speed is actually km/s
-    } else if (delayMinutesIfMperS >= 30 && delayMinutesIfMperS <= 120) {
-      return delayMinutesIfMperS; // Speed is actually m/s
-    } else {
-      return 60.0; // Default fallback
-    }
+    // Simple formula: 1,500,000 / speed / 60 = minutes
+    const double l1ToEarthKm = 1500000.0; // 1.5 million km
+    return l1ToEarthKm / speed / 60.0;
   }
 
   double _calculateBzH(List<double> values) {
