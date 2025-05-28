@@ -249,7 +249,7 @@ class _MyPhotosTabState extends State<MyPhotosTab>
         // Firebase stream for user photos
         Expanded(
           child: StreamBuilder<QuerySnapshot>(
-            stream: _firebaseService.getUserPhotosStream(),
+            stream: _firebaseService.getUserPhotoStream(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(

@@ -6,9 +6,13 @@ import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
 import 'dart:io';
+import 'dart:async';
 import '../services/firebase_service.dart';
 import '../widgets/intensity_selector.dart';
 import '../models/aurora_sighting.dart';
+import '../services/solar_wind_service.dart';
+import '../services/kp_service.dart';
+import '../services/aurora_message_service.dart';
 
 class CameraAuroraScreen extends StatefulWidget {
   final double currentBzH;
@@ -31,12 +35,18 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   CameraController? _cameraController;
   List<CameraDescription>? _cameras;
   bool _isCameraInitialized = false;
-  bool _isFlashOn = false;
   bool _isRearCamera = true;
 
   // Location variables
   Position? _currentPosition;
   String _locationName = 'Unknown Location';
+
+  // Aurora data variables
+  double _currentBzH = 0.0;
+  double _currentKp = 0.0;
+  double _solarWindSpeed = 0.0;
+  double _solarWindDensity = 0.0;
+  Timer? _auroraDataTimer;
 
   // Aurora sighting variables
   int _selectedIntensity = 3;
@@ -70,6 +80,12 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
 
     _initializeCamera();
     _getCurrentLocation();
+    _fetchAuroraData();
+    
+    // Set up timer to refresh aurora data every 5 minutes
+    _auroraDataTimer = Timer.periodic(const Duration(minutes: 5), (timer) {
+      _fetchAuroraData();
+    });
   }
 
   @override
@@ -79,6 +95,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     _pulseController.dispose();
     _slideController.dispose();
     _descriptionController.dispose();
+    _auroraDataTimer?.cancel();
     super.dispose();
   }
 
@@ -229,22 +246,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     }
   }
 
-  Future<void> _toggleFlash() async {
-    if (!_isCameraInitialized || _cameraController == null) return;
-
-    try {
-      await _cameraController!.setFlashMode(
-        _isFlashOn ? FlashMode.off : FlashMode.torch,
-      );
-      setState(() {
-        _isFlashOn = !_isFlashOn;
-      });
-      HapticFeedback.lightImpact();
-    } catch (e) {
-      // Flash not supported
-    }
-  }
-
   Future<void> _switchCamera() async {
     if (!_isCameraInitialized || _cameras == null || _cameras!.length < 2) return;
 
@@ -267,7 +268,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
 
       setState(() {
         _isRearCamera = !_isRearCamera;
-        _isFlashOn = false; // Reset flash when switching cameras
       });
 
       HapticFeedback.selectionClick();
@@ -303,9 +303,9 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
         intensity: _selectedIntensity,
         description: _description.isNotEmpty ? _description : 'Aurora sighting',
         photoFile: _capturedPhoto,
-        bzH: widget.currentBzH,
-        kp: widget.currentKp,
-        solarWindSpeed: 400.0,
+        bzH: _currentBzH,
+        kp: _currentKp,
+        solarWindSpeed: _solarWindSpeed,
       );
 
       print('✅ Sighting submitted with ID: $sightingId');
@@ -442,6 +442,36 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     );
   }
 
+  Future<void> _fetchAuroraData() async {
+    try {
+      // Fetch Bz history and calculate BzH
+      final bzHistory = await SolarWindService.fetchBzHistory();
+      final bzH = _calculateBzH(bzHistory.bzValues);
+      
+      // Fetch current Kp
+      final kp = await KpService.fetchCurrentKp();
+      
+      // Fetch solar wind data
+      final solarWindData = await SolarWindService.fetchData();
+
+      setState(() {
+        _currentBzH = bzH;
+        _currentKp = kp;
+        _solarWindSpeed = solarWindData.speed;
+        _solarWindDensity = solarWindData.density;
+      });
+    } catch (e) {
+      print('Error fetching aurora data: $e');
+    }
+  }
+
+  double _calculateBzH(List<double> values) {
+    if (values.isEmpty) return 0.0;
+    final recent = values.length > 60 ? values.sublist(values.length - 60) : values;
+    final sum = recent.where((bz) => bz < 0).fold(0.0, (acc, bz) => acc + (-bz / 60));
+    return double.parse(sum.toStringAsFixed(2));
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -451,7 +481,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           // Camera preview
           if (_isCameraInitialized && _cameraController != null)
             Positioned.fill(
-              child: CameraPreview(_cameraController!),
+              child: _buildCameraUI(),
             )
           else
             Positioned.fill(
@@ -485,12 +515,34 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                 borderRadius: BorderRadius.circular(12),
                 border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
               ),
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceAround,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
                 children: [
-                  _buildConditionItem('BzH', '${widget.currentBzH.toStringAsFixed(1)} nT'),
-                  _buildConditionItem('Kp', widget.currentKp.toStringAsFixed(1)),
-                  _buildConditionItem('📍', _locationName),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildConditionItem('BzH', '${_currentBzH.toStringAsFixed(1)} nT'),
+                      _buildConditionItem('Kp', _currentKp.toStringAsFixed(1)),
+                      _buildConditionItem('📍', _locationName),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      AuroraMessageService.getCombinedAuroraMessage(_currentKp, _currentBzH),
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
                 ],
               ),
             ),
@@ -502,24 +554,79 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
               bottom: MediaQuery.of(context).padding.bottom + 20,
               left: 20,
               right: 20,
-              child: _buildCameraControls(),
-            ),
+              child: Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  // Switch camera button
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      onPressed: _cameras != null && _cameras!.length > 1 ? _switchCamera : null,
+                      icon: Icon(
+                        Icons.flip_camera_ios,
+                        color: _cameras != null && _cameras!.length > 1 ? Colors.white : Colors.grey,
+                        size: 28,
+                      ),
+                    ),
+                  ),
 
-          // Close button
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
-            left: 16,
-            child: Container(
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.5),
-                shape: BoxShape.circle,
-              ),
-              child: IconButton(
-                icon: Icon(Icons.close, color: Colors.white),
-                onPressed: () => Navigator.of(context).pop(),
+                  // Capture button
+                  AnimatedBuilder(
+                    animation: _pulseController,
+                    builder: (context, child) {
+                      return Transform.scale(
+                        scale: 1.0 + (_pulseController.value * 0.1),
+                        child: GestureDetector(
+                          onTap: _capturePhoto,
+                          child: Container(
+                            width: 80,
+                            height: 80,
+                            decoration: BoxDecoration(
+                              shape: BoxShape.circle,
+                              border: Border.all(color: Colors.tealAccent, width: 4),
+                              boxShadow: [
+                                BoxShadow(
+                                  color: Colors.tealAccent.withOpacity(0.5),
+                                  blurRadius: 20,
+                                  spreadRadius: 2,
+                                ),
+                              ],
+                            ),
+                            child: Container(
+                              margin: const EdgeInsets.all(8),
+                              decoration: const BoxDecoration(
+                                color: Colors.tealAccent,
+                                shape: BoxShape.circle,
+                              ),
+                              child: const Icon(
+                                Icons.camera_alt,
+                                color: Colors.black,
+                                size: 32,
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+
+                  // Close button
+                  Container(
+                    decoration: BoxDecoration(
+                      color: Colors.black.withOpacity(0.5),
+                      shape: BoxShape.circle,
+                    ),
+                    child: IconButton(
+                      icon: const Icon(Icons.close, color: Colors.white),
+                      onPressed: () => Navigator.of(context).pop(),
+                    ),
+                  ),
+                ],
               ),
             ),
-          ),
 
           // Aurora sighting details form
           if (_showDetailsForm)
@@ -539,6 +646,29 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   }
 
   Widget _buildConditionItem(String label, String value) {
+    Color valueColor = Colors.white;
+    if (label == 'BzH') {
+      // Color coding for BzH values
+      double bzValue = double.tryParse(value.replaceAll(' nT', '')) ?? 0;
+      if (bzValue < -10) {
+        valueColor = Colors.red; // Strong negative BzH (good for aurora)
+      } else if (bzValue < -5) {
+        valueColor = Colors.orange; // Moderate negative BzH
+      } else if (bzValue < 0) {
+        valueColor = Colors.yellow; // Slight negative BzH
+      }
+    } else if (label == 'Kp') {
+      // Color coding for Kp values
+      double kpValue = double.tryParse(value) ?? 0;
+      if (kpValue >= 5) {
+        valueColor = Colors.red; // Strong geomagnetic activity
+      } else if (kpValue >= 4) {
+        valueColor = Colors.orange; // Moderate geomagnetic activity
+      } else if (kpValue >= 3) {
+        valueColor = Colors.yellow; // Minor geomagnetic activity
+      }
+    }
+
     return Column(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -546,94 +676,24 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           label,
           style: TextStyle(
             color: Colors.tealAccent,
-            fontSize: 10,
+            fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
         ),
-        Text(
-          value,
-          style: TextStyle(
-            color: Colors.white,
-            fontSize: 12,
-            fontWeight: FontWeight.w600,
-          ),
-        ),
-      ],
-    );
-  }
-
-  Widget _buildCameraControls() {
-    return Row(
-      mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-      children: [
-        // Flash toggle
+        SizedBox(height: 4),
         Container(
+          padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
             color: Colors.black.withOpacity(0.5),
-            shape: BoxShape.circle,
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(color: valueColor.withOpacity(0.3)),
           ),
-          child: IconButton(
-            onPressed: _toggleFlash,
-            icon: Icon(
-              _isFlashOn ? Icons.flash_on : Icons.flash_off,
-              color: _isFlashOn ? Colors.amber : Colors.white,
-              size: 28,
-            ),
-          ),
-        ),
-
-        // Capture button
-        AnimatedBuilder(
-          animation: _pulseController,
-          builder: (context, child) {
-            return Transform.scale(
-              scale: 1.0 + (_pulseController.value * 0.1),
-              child: GestureDetector(
-                onTap: _capturePhoto,
-                child: Container(
-                  width: 80,
-                  height: 80,
-                  decoration: BoxDecoration(
-                    shape: BoxShape.circle,
-                    border: Border.all(color: Colors.tealAccent, width: 4),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.tealAccent.withOpacity(0.5),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                      ),
-                    ],
-                  ),
-                  child: Container(
-                    margin: EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.tealAccent,
-                      shape: BoxShape.circle,
-                    ),
-                    child: Icon(
-                      Icons.camera_alt,
-                      color: Colors.black,
-                      size: 32,
-                    ),
-                  ),
-                ),
-              ),
-            );
-          },
-        ),
-
-        // Camera switch
-        Container(
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
-            shape: BoxShape.circle,
-          ),
-          child: IconButton(
-            onPressed: _cameras != null && _cameras!.length > 1 ? _switchCamera : null,
-            icon: Icon(
-              Icons.flip_camera_ios,
-              color: _cameras != null && _cameras!.length > 1 ? Colors.white : Colors.grey,
-              size: 28,
+          child: Text(
+            value,
+            style: TextStyle(
+              color: valueColor,
+              fontSize: 14,
+              fontWeight: FontWeight.w600,
             ),
           ),
         ),
@@ -850,6 +910,146 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           ),
         ],
       ),
+    );
+  }
+
+  Widget _buildCameraUI() {
+    if (!_isCameraInitialized || _cameraController == null) {
+      return const Center(
+        child: CircularProgressIndicator(color: Colors.tealAccent),
+      );
+    }
+
+    return Stack(
+      children: [
+        // Camera preview
+        CameraPreview(_cameraController!),
+
+        // Aurora conditions overlay
+        Positioned(
+          top: MediaQuery.of(context).padding.top + 16,
+          left: 16,
+          right: 16,
+          child: Container(
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+            ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceAround,
+                  children: [
+                    _buildConditionItem('BzH', '${_currentBzH.toStringAsFixed(1)} nT'),
+                    _buildConditionItem('Kp', _currentKp.toStringAsFixed(1)),
+                    _buildConditionItem('📍', _locationName),
+                  ],
+                ),
+                SizedBox(height: 8),
+                Container(
+                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    AuroraMessageService.getCombinedAuroraMessage(_currentKp, _currentBzH),
+                    style: TextStyle(
+                      color: Colors.white70,
+                      fontSize: 12,
+                      fontWeight: FontWeight.w500,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ),
+
+        // Camera controls
+        if (_showCaptureUI && !_showDetailsForm)
+          Positioned(
+            bottom: MediaQuery.of(context).padding.bottom + 20,
+            left: 20,
+            right: 20,
+            child: Row(
+              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              children: [
+                // Switch camera button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    onPressed: _cameras != null && _cameras!.length > 1 ? _switchCamera : null,
+                    icon: Icon(
+                      Icons.flip_camera_ios,
+                      color: _cameras != null && _cameras!.length > 1 ? Colors.white : Colors.grey,
+                      size: 28,
+                    ),
+                  ),
+                ),
+
+                // Capture button
+                AnimatedBuilder(
+                  animation: _pulseController,
+                  builder: (context, child) {
+                    return Transform.scale(
+                      scale: 1.0 + (_pulseController.value * 0.1),
+                      child: GestureDetector(
+                        onTap: _capturePhoto,
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.tealAccent, width: 4),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.tealAccent.withOpacity(0.5),
+                                blurRadius: 20,
+                                spreadRadius: 2,
+                              ),
+                            ],
+                          ),
+                          child: Container(
+                            margin: const EdgeInsets.all(8),
+                            decoration: const BoxDecoration(
+                              color: Colors.tealAccent,
+                              shape: BoxShape.circle,
+                            ),
+                            child: const Icon(
+                              Icons.camera_alt,
+                              color: Colors.black,
+                              size: 32,
+                            ),
+                          ),
+                        ),
+                      ),
+                    );
+                  },
+                ),
+
+                // Close button
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.5),
+                    shape: BoxShape.circle,
+                  ),
+                  child: IconButton(
+                    icon: const Icon(Icons.close, color: Colors.white),
+                    onPressed: () => Navigator.of(context).pop(),
+                  ),
+                ),
+              ],
+            ),
+          ),
+      ],
     );
   }
 }
