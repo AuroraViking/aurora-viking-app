@@ -3,11 +3,15 @@ import 'package:flutter/services.dart';
 import 'forecast_tab.dart';
 import 'my_photos_tab.dart';
 import 'print_shop_tab.dart';
-import 'pickup_tab.dart';
+import 'tour_tab.dart';
 import 'aurora_alerts_tab.dart';
 import 'spot_aurora_screen.dart';
 import '../services/firebase_service.dart';
 import '../services/aurora_message_service.dart';
+import '../widgets/user_badge.dart';
+import 'tour_auth_screen.dart';
+import 'package:firebase_auth/firebase_auth.dart';
+import 'satellite_map_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -19,6 +23,8 @@ class HomeScreen extends StatefulWidget {
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _selectedIndex = 0;
   bool _showSpotAuroraFAB = false;
+  bool _isInitialized = false;
+  String? _errorMessage;
 
   // Aurora conditions for FAB visibility
   double _currentBzH = 0.0;
@@ -59,10 +65,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Subscribe to aurora alerts for Iceland
       await _firebaseService.subscribeToAuroraAlerts('iceland');
 
+      setState(() {
+        _isInitialized = true;
+        _errorMessage = null;
+      });
+
       print('✅ Services initialized successfully');
-      print('👤 User: ${_firebaseService.userDisplayName} (${_firebaseService.isGuest ? "Guest" : "Authenticated"})');
+      print('👤 User: ${_firebaseService.userDisplayName}');
     } catch (e) {
       print('❌ Service initialization failed: $e');
+      setState(() {
+        _isInitialized = false;
+        _errorMessage = 'Failed to initialize services: $e';
+      });
     }
   }
 
@@ -169,13 +184,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       case 0:
         return const ForecastTab();
       case 1:
-        return const AuroraAlertsTab();
+        return const SatelliteMapTab();
       case 2:
-        return const MyPhotosTab();
+        return const AuroraAlertsTab();
       case 3:
-        return const PrintShopTab();
+        return const MyPhotosTab();
       case 4:
-        return const PickupTab();
+        return const PrintShopTab();
+      case 5:
+        return const TourTab();
       default:
         return const ForecastTab();
     }
@@ -183,74 +200,184 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
 
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      backgroundColor: const Color(0xFF0A0F1C),
-      body: AnimatedBuilder(
-        animation: _navigationAnimationController,
-        builder: (context, child) {
-          return FadeTransition(
-            opacity: _navigationAnimationController,
-            child: SlideTransition(
-              position: Tween<Offset>(
-                begin: const Offset(0.0, 0.1),
-                end: Offset.zero,
-              ).animate(CurvedAnimation(
-                parent: _navigationAnimationController,
-                curve: Curves.easeOutCubic,
-              )),
-              child: _buildBody(),
-            ),
-          );
-        },
-      ),
-      bottomNavigationBar: Container(
-        decoration: BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [
-              Colors.transparent,
-              const Color(0xFF0A0F1C).withOpacity(0.8),
-              const Color(0xFF0A0F1C),
+    if (!_isInitialized) {
+      return Scaffold(
+        backgroundColor: const Color(0xFF0A0F1C),
+        body: Center(
+          child: Column(
+            mainAxisAlignment: MainAxisAlignment.center,
+            children: [
+              const CircularProgressIndicator(),
+              const SizedBox(height: 20),
+              Text(
+                _errorMessage ?? 'Initializing services...',
+                textAlign: TextAlign.center,
+                style: const TextStyle(color: Colors.white),
+              ),
+              if (_errorMessage != null) ...[
+                const SizedBox(height: 20),
+                ElevatedButton(
+                  onPressed: _initializeServices,
+                  child: const Text('Retry'),
+                ),
+              ],
             ],
           ),
         ),
-        child: SafeArea(
-          child: Container(
-            height: 80,
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            decoration: BoxDecoration(
-              color: const Color(0xFF1A1F2E).withOpacity(0.9),
-              borderRadius: BorderRadius.circular(25),
-              border: Border.all(
-                color: const Color(0xFF00D4AA).withOpacity(0.3),
-                width: 1,
+      );
+    }
+
+    return StreamBuilder<User?>(
+      stream: _firebaseService.auth.authStateChanges(),
+      builder: (context, snapshot) {
+        final isAuthenticated = snapshot.hasData;
+
+        return Scaffold(
+          backgroundColor: const Color(0xFF0A0F1C),
+          appBar: AppBar(
+            backgroundColor: Colors.transparent,
+            elevation: 0,
+            title: const Text(
+              'Aurora Viking',
+              style: TextStyle(color: Colors.white),
+            ),
+            actions: const [
+              Padding(
+                padding: EdgeInsets.only(right: 16),
+                child: UserBadge(),
               ),
-              boxShadow: [
-                BoxShadow(
-                  color: const Color(0xFF00D4AA).withOpacity(0.1),
-                  blurRadius: 20,
-                  spreadRadius: 0,
-                ),
-              ],
-            ),
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                _buildNavItem(0, Icons.analytics_outlined, 'Forecast'),
-                _buildNavItem(1, Icons.people_outline, 'Community'),
-                _buildNavItem(2, Icons.photo_library_outlined, 'Photos'),
-                _buildNavItem(3, Icons.print_outlined, 'Print'),
-                _buildNavItem(4, Icons.local_shipping_outlined, 'Pickup'),
-              ],
-            ),
+            ],
           ),
-        ),
-      ),
-      floatingActionButton: _showSpotAuroraFAB
-          ? _buildSpotAuroraFAB()
-          : null,
-      floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+          body: !isAuthenticated
+              ? Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(
+                        Icons.account_circle,
+                        size: 64,
+                        color: Colors.blueAccent,
+                      ),
+                      const SizedBox(height: 16),
+                      const Text(
+                        'Welcome to Aurora Viking',
+                        style: TextStyle(
+                          color: Colors.white,
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      const Text(
+                        'Please sign in to continue',
+                        style: TextStyle(
+                          color: Colors.white70,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(height: 24),
+                      ElevatedButton(
+                        onPressed: () {
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const TourAuthScreen(),
+                            ),
+                          );
+                        },
+                        style: ElevatedButton.styleFrom(
+                          backgroundColor: Colors.blueAccent,
+                          foregroundColor: Colors.white,
+                          padding: const EdgeInsets.symmetric(
+                            horizontal: 32,
+                            vertical: 16,
+                          ),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                        ),
+                        child: const Text(
+                          'Sign In',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              : AnimatedBuilder(
+                  animation: _navigationAnimationController,
+                  builder: (context, child) {
+                    return FadeTransition(
+                      opacity: _navigationAnimationController,
+                      child: SlideTransition(
+                        position: Tween<Offset>(
+                          begin: const Offset(0.0, 0.1),
+                          end: Offset.zero,
+                        ).animate(CurvedAnimation(
+                          parent: _navigationAnimationController,
+                          curve: Curves.easeOutCubic,
+                        )),
+                        child: _buildBody(),
+                      ),
+                    );
+                  },
+                ),
+          bottomNavigationBar: isAuthenticated
+              ? Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Colors.transparent,
+                        const Color(0xFF0A0F1C).withOpacity(0.8),
+                        const Color(0xFF0A0F1C),
+                      ],
+                    ),
+                  ),
+                  child: SafeArea(
+                    child: Container(
+                      height: 80,
+                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                      decoration: BoxDecoration(
+                        color: const Color(0xFF1A1F2E).withOpacity(0.9),
+                        borderRadius: BorderRadius.circular(25),
+                        border: Border.all(
+                          color: const Color(0xFF00D4AA).withOpacity(0.3),
+                          width: 1,
+                        ),
+                        boxShadow: [
+                          BoxShadow(
+                            color: const Color(0xFF00D4AA).withOpacity(0.1),
+                            blurRadius: 20,
+                            spreadRadius: 0,
+                          ),
+                        ],
+                      ),
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                        children: [
+                          _buildNavItem(0, Icons.analytics_outlined, 'Aurora Real Time Data'),
+                          _buildNavItem(1, Icons.satellite_alt, 'Satellite Map'),
+                          _buildNavItem(2, Icons.people_outline, 'Community'),
+                          _buildNavItem(3, Icons.photo_library_outlined, 'Photos'),
+                          _buildNavItem(4, Icons.print_outlined, 'Print'),
+                          _buildNavItem(5, Icons.tour, 'Tour'),
+                        ],
+                      ),
+                    ),
+                  ),
+                )
+              : null,
+          floatingActionButton: isAuthenticated && _showSpotAuroraFAB
+              ? _buildSpotAuroraFAB()
+              : null,
+          floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+        );
+      },
     );
   }
 

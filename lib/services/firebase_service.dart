@@ -6,6 +6,8 @@ import 'package:firebase_messaging/firebase_messaging.dart';
 import 'dart:io';
 import 'dart:typed_data';
 import 'dart:math' as math;
+import '../services/user_photos_service.dart';
+import '../services/bokun_service.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -20,59 +22,28 @@ class FirebaseService {
 
   // Current user properties
   User? get currentUser => auth.currentUser;
-  bool get isAuthenticated => currentUser != null && !currentUser!.isAnonymous;
-  bool get isGuest => currentUser != null && currentUser!.isAnonymous;
+  bool get isAuthenticated => currentUser != null;
   String get userDisplayName {
-    if (currentUser == null) return 'Guest';
-    if (isGuest) return 'Guest';
+    if (currentUser == null) return 'Not Signed In';
     return currentUser!.displayName ?? currentUser!.email ?? 'User';
   }
 
-  // Initialize Firebase with automatic guest sign-in
+  // Initialize Firebase
   static Future<void> initialize() async {
     await Firebase.initializeApp();
-
-    // Automatically sign in as guest if no user is signed in
-    final firebaseService = FirebaseService();
-    if (firebaseService.currentUser == null) {
-      await firebaseService.signInAsGuest();
-    }
-
-    await firebaseService._setupMessaging();
-    print('✅ Firebase initialized - User: ${firebaseService.userDisplayName}');
+    await FirebaseService()._setupMessaging();
+    print('✅ Firebase initialized');
   }
 
   // AUTHENTICATION METHODS
 
-  // Sign in as guest (replaces anonymous)
-  Future<UserCredential?> signInAsGuest() async {
-    try {
-      final credential = await auth.signInAnonymously();
-      print('✅ Signed in as guest');
-      return credential;
-    } catch (e) {
-      print('❌ Guest sign in failed: $e');
-      return null;
-    }
-  }
-
-  // Email/password registration - converts guest to full user
+  // Email/password registration
   Future<UserCredential?> registerWithEmail(String email, String password, String displayName) async {
     try {
-      UserCredential credential;
-
-      // If user is currently a guest, link the account
-      if (isGuest) {
-        final emailCredential = EmailAuthProvider.credential(email: email, password: password);
-        credential = await currentUser!.linkWithCredential(emailCredential);
-        print('✅ Guest account converted to full user');
-      } else {
-        // Create new account
-        credential = await auth.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-      }
+      final credential = await auth.createUserWithEmailAndPassword(
+        email: email,
+        password: password,
+      );
 
       // Update display name
       await credential.user?.updateDisplayName(displayName);
@@ -88,23 +59,31 @@ class FirebaseService {
   // Email/password sign in
   Future<UserCredential?> signInWithEmail(String email, String password) async {
     try {
-      return await auth.signInWithEmailAndPassword(
+      final credential = await auth.signInWithEmailAndPassword(
         email: email,
         password: password,
       );
+
+      // Update user type in Firestore
+      if (credential.user != null) {
+        await firestore.collection('users').doc(credential.user!.uid).update({
+          'userType': 'aurora_user',
+          'lastActive': FieldValue.serverTimestamp(),
+        });
+      }
+
+      return credential;
     } catch (e) {
       print('❌ Sign in failed: $e');
       return null;
     }
   }
 
-  // Sign out - returns to guest mode
+  // Sign out
   Future<void> signOut() async {
     try {
       await auth.signOut();
-      // Automatically sign back in as guest
-      await signInAsGuest();
-      print('✅ Signed out and returned to guest mode');
+      print('✅ Signed out successfully');
     } catch (e) {
       print('❌ Sign out failed: $e');
     }
@@ -117,15 +96,71 @@ class FirebaseService {
         'email': user.email,
         'displayName': user.displayName,
         'createdAt': FieldValue.serverTimestamp(),
-        'isGuest': user.isAnonymous,
         'auroraSpottingCount': 0,
         'verificationCount': 0,
         'lastActive': FieldValue.serverTimestamp(),
+        'userType': 'aurora_user',
+        'tourParticipant': false,
+        'tourBookings': [],
+        'verifiedTourEmail': null,
       }, SetOptions(merge: true));
 
       print('✅ User profile created/updated');
     } catch (e) {
       print('❌ Failed to create user profile: $e');
+    }
+  }
+
+  // Verify tour participant status
+  Future<Map<String, dynamic>?> verifyTourParticipant(String reference) async {
+    try {
+      // First verify the booking exists in Bokun
+      final bookingDetails = await BokunService().verifyBookingReference(reference);
+      
+      if (bookingDetails != null && bookingDetails['isValid'] == true) {
+        // Update user profile with booking reference
+        final user = FirebaseAuth.instance.currentUser;
+        if (user != null) {
+          await firestore.collection('users').doc(user.uid).update({
+            'hasVerifiedBooking': true,
+            'bookingReference': reference,
+            'bookingDetails': bookingDetails,
+            'lastVerified': FieldValue.serverTimestamp(),
+          });
+        }
+        return bookingDetails;
+      }
+      
+      return null;
+    } catch (e) {
+      print('Error verifying tour participant: $e');
+      rethrow;
+    }
+  }
+
+  // Get user type
+  Future<String> getUserType() async {
+    if (currentUser == null) return 'guest';
+
+    try {
+      final doc = await firestore.collection('users').doc(currentUser!.uid).get();
+      return doc.data()?['userType'] ?? 'aurora_user';
+    } catch (e) {
+      print('❌ Failed to get user type: $e');
+      return 'aurora_user';
+    }
+  }
+
+  // Check if user is tour participant
+  Future<bool> isTourParticipant() async {
+    if (currentUser == null) return false;
+
+    try {
+      final doc = await firestore.collection('users').doc(currentUser!.uid).get();
+      return doc.data()?['tourParticipant'] ?? false;
+    } catch (e) {
+      print('❌ Failed to check tour participant status: $e');
+      return false;
     }
   }
 
@@ -145,7 +180,7 @@ class FirebaseService {
     required double solarWindSpeed,
   }) async {
     if (currentUser == null) {
-      await signInAsGuest();
+      return null;
     }
 
     try {
@@ -185,6 +220,24 @@ class FirebaseService {
           'auroraSpottingCount': FieldValue.increment(1),
           'lastActive': FieldValue.serverTimestamp(),
         });
+      }
+
+      // Also save as user photo if photo was uploaded
+      if (photoUrl != null) {
+        await UserPhotosService.saveUserPhoto(
+          sightingId: sightingRef.id,
+          photoUrl: photoUrl,
+          locationName: address,
+          intensity: intensity,
+          metadata: {
+            'description': description,
+            'weather': {
+              'bzH': bzH,
+              'kp': kp,
+              'solarWindSpeed': solarWindSpeed,
+            },
+          },
+        );
       }
 
       return sightingRef.id;
@@ -432,5 +485,90 @@ class FirebaseService {
         .orderBy('capturedAt', descending: true)
         .limit(limit)
         .snapshots();
+  }
+
+  // Get user type stream
+  Stream<String> getUserTypeStream() {
+    if (currentUser == null) return Stream.value('not_signed_in');
+
+    return firestore
+        .collection('users')
+        .doc(currentUser!.uid)
+        .snapshots()
+        .map((doc) {
+          if (!doc.exists) return 'aurora_user';
+          final data = doc.data() ?? {};
+          return data['userType'] ?? 'aurora_user';
+        });
+  }
+
+  // Update user type
+  Future<void> updateUserType(String userType) async {
+    if (currentUser == null) return;
+
+    try {
+      await firestore.collection('users').doc(currentUser!.uid).update({
+        'userType': userType,
+        'lastActive': FieldValue.serverTimestamp(),
+      });
+      print('✅ User type updated to: $userType');
+    } catch (e) {
+      print('❌ Failed to update user type: $e');
+    }
+  }
+
+  // Get user stats
+  Future<Map<String, int>> getUserStats() async {
+    if (currentUser == null) return {'sightings': 0, 'verifications': 0};
+
+    try {
+      final doc = await firestore.collection('users').doc(currentUser!.uid).get();
+      final data = doc.data() ?? {};
+      return {
+        'sightings': data['auroraSpottingCount'] ?? 0,
+        'verifications': data['verificationCount'] ?? 0,
+      };
+    } catch (e) {
+      print('❌ Failed to get user stats: $e');
+      return {'sightings': 0, 'verifications': 0};
+    }
+  }
+
+  // Update profile picture
+  Future<String?> updateProfilePicture(File imageFile) async {
+    if (currentUser == null) return null;
+
+    try {
+      final fileName = 'profile_${currentUser!.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
+      final ref = storage.ref().child('profile_pictures/$fileName');
+      
+      final uploadTask = ref.putFile(imageFile);
+      final snapshot = await uploadTask;
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+
+      // Update user profile with new picture URL
+      await firestore.collection('users').doc(currentUser!.uid).update({
+        'profilePictureUrl': downloadUrl,
+        'lastActive': FieldValue.serverTimestamp(),
+      });
+
+      return downloadUrl;
+    } catch (e) {
+      print('❌ Failed to update profile picture: $e');
+      return null;
+    }
+  }
+
+  // Get profile picture URL
+  Future<String?> getProfilePictureUrl() async {
+    if (currentUser == null) return null;
+
+    try {
+      final doc = await firestore.collection('users').doc(currentUser!.uid).get();
+      return doc.data()?['profilePictureUrl'];
+    } catch (e) {
+      print('❌ Failed to get profile picture URL: $e');
+      return null;
+    }
   }
 }
