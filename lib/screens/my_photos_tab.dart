@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import '../services/google_drive_service.dart';
 import '../services/firebase_service.dart';
+import '../services/user_photos_service.dart';
 import '../models/tour_photo.dart';
 import '../models/user_aurora_photo.dart';
 import '../screens/print_shop_tab.dart' as print_shop;
@@ -236,7 +237,7 @@ class _MyPhotosTabState extends State<MyPhotosTab>
 
   // NEW TAB - User Aurora Photos
   Widget _buildUserPhotosTab() {
-    if (!_firebaseService.isAuthenticated) {
+    if (_firebaseService.currentUser == null) {
       return _buildSignInPrompt();
     }
 
@@ -248,8 +249,8 @@ class _MyPhotosTabState extends State<MyPhotosTab>
 
         // Firebase stream for user photos
         Expanded(
-          child: StreamBuilder<QuerySnapshot>(
-            stream: _firebaseService.getUserPhotoStream(),
+          child: StreamBuilder<List<UserAuroraPhoto>>(
+            stream: UserPhotosService.getUserPhotosStream(),
             builder: (context, snapshot) {
               if (snapshot.connectionState == ConnectionState.waiting) {
                 return const Center(
@@ -266,12 +267,11 @@ class _MyPhotosTabState extends State<MyPhotosTab>
                 );
               }
 
-              if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+              if (!snapshot.hasData || snapshot.data!.isEmpty) {
                 return _buildEmptyUserPhotos();
               }
 
-              final userPhotos = snapshot.data!.docs
-                  .map((doc) => UserAuroraPhoto.fromFirestore(doc))
+              final userPhotos = snapshot.data!
                   .where(_filterUserPhoto)
                   .toList();
 

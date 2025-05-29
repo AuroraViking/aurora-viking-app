@@ -81,9 +81,7 @@ class _SignInWidgetState extends State<SignInWidget>
                 ),
                 const SizedBox(height: 8),
                 Text(
-                  _firebaseService.isGuest
-                      ? 'Create an account to save your sightings and join the community'
-                      : 'Sign in to access community features',
+                  'Sign in to access community features',
                   style: const TextStyle(
                     fontSize: 14,
                     color: Colors.white70,
@@ -130,47 +128,6 @@ class _SignInWidgetState extends State<SignInWidget>
               ],
             ),
           ),
-
-          // Guest info
-          if (_firebaseService.isGuest) ...[
-            Container(
-              margin: const EdgeInsets.all(24),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                color: Colors.amber.withOpacity(0.1),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.amber.withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  const Icon(Icons.info_outline, color: Colors.amber, size: 20),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Currently browsing as Guest',
-                          style: TextStyle(
-                            color: Colors.amber,
-                            fontSize: 12,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const Text(
-                          'Your data will be preserved when you create an account',
-                          style: TextStyle(
-                            color: Colors.white70,
-                            fontSize: 11,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ],
         ],
       ),
     );
@@ -365,7 +322,7 @@ class _SignInWidgetState extends State<SignInWidget>
                 strokeWidth: 2,
               )
                   : Text(
-                _firebaseService.isGuest ? 'Upgrade Account' : 'Create Account',
+                'Create Account',
                 style: const TextStyle(
                   fontSize: 16,
                   fontWeight: FontWeight.bold,
@@ -476,9 +433,7 @@ class _SignInWidgetState extends State<SignInWidget>
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text(
-                _firebaseService.isGuest
-                    ? '✅ Account upgraded successfully!'
-                    : '✅ Account created successfully!',
+                '✅ Account created successfully!',
               ),
               backgroundColor: Colors.tealAccent,
             ),

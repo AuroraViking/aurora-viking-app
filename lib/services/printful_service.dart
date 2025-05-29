@@ -1,22 +1,21 @@
 import 'dart:convert';
 import 'dart:io';
 import 'package:http/http.dart' as http;
-import 'package:flutter_dotenv/flutter_dotenv.dart';
 import '../models/print_product.dart';
+import 'config_service.dart';
 
 class PrintfulService {
   static final PrintfulService _instance = PrintfulService._internal();
   factory PrintfulService() => _instance;
-  PrintfulService._internal();
+  
+  static const String _baseUrl = 'https://api.printful.com';
+  late final String _authToken;
 
-  static const String baseUrl = 'https://api.printful.com';
-
-  String get apiKey => dotenv.env['PRINTFUL_API_KEY'] ?? '';
-
-  Map<String, String> get headers => {
-    'Authorization': 'Bearer $apiKey',
-    'Content-Type': 'application/json',
-  };
+  PrintfulService._internal() {
+    _authToken = base64Encode(
+      utf8.encode('${ConfigService.printfulClientId}:${ConfigService.printfulSecretKey}')
+    );
+  }
 
   // PRODUCT CATALOG METHODS
 
@@ -24,8 +23,11 @@ class PrintfulService {
   Future<List<PrintProduct>> getProducts() async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/products'),
-        headers: headers,
+        Uri.parse('$_baseUrl/products'),
+        headers: {
+          'Authorization': 'Basic $_authToken',
+          'Content-Type': 'application/json',
+        },
       );
 
       if (response.statusCode == 200) {
@@ -50,8 +52,11 @@ class PrintfulService {
   Future<List<ProductVariant>> getProductVariants(int productId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/products/$productId'),
-        headers: headers,
+        Uri.parse('$_baseUrl/products/$productId'),
+        headers: {
+          'Authorization': 'Basic $_authToken',
+          'Content-Type': 'application/json',
+        },
       );
 
       if (response.statusCode == 200) {
@@ -102,8 +107,11 @@ class PrintfulService {
       };
 
       final response = await http.post(
-        Uri.parse('$baseUrl/mockup-generator/create-task/$productId'),
-        headers: headers,
+        Uri.parse('$_baseUrl/mockup-generator/create-task/$productId'),
+        headers: {
+          'Authorization': 'Basic $_authToken',
+          'Content-Type': 'application/json',
+        },
         body: json.encode(body),
       );
 
@@ -129,8 +137,11 @@ class PrintfulService {
 
       try {
         final response = await http.get(
-          Uri.parse('$baseUrl/mockup-generator/task?task_key=$taskKey'),
-          headers: headers,
+          Uri.parse('$_baseUrl/mockup-generator/task?task_key=$taskKey'),
+          headers: {
+            'Authorization': 'Basic $_authToken',
+            'Content-Type': 'application/json',
+          },
         );
 
         if (response.statusCode == 200) {
@@ -168,8 +179,11 @@ class PrintfulService {
       };
 
       final response = await http.post(
-        Uri.parse('$baseUrl/shipping/rates'),
-        headers: headers,
+        Uri.parse('$_baseUrl/shipping/rates'),
+        headers: {
+          'Authorization': 'Basic $_authToken',
+          'Content-Type': 'application/json',
+        },
         body: json.encode(body),
       );
 
@@ -210,8 +224,11 @@ class PrintfulService {
       };
 
       final response = await http.post(
-        Uri.parse('$baseUrl/orders'),
-        headers: headers,
+        Uri.parse('$_baseUrl/orders'),
+        headers: {
+          'Authorization': 'Basic $_authToken',
+          'Content-Type': 'application/json',
+        },
         body: json.encode(body),
       );
 
@@ -231,8 +248,11 @@ class PrintfulService {
   Future<Map<String, dynamic>?> getOrder(String orderId) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/orders/$orderId'),
-        headers: headers,
+        Uri.parse('$_baseUrl/orders/$orderId'),
+        headers: {
+          'Authorization': 'Basic $_authToken',
+          'Content-Type': 'application/json',
+        },
       );
 
       if (response.statusCode == 200) {
@@ -251,8 +271,11 @@ class PrintfulService {
   Future<bool> cancelOrder(String orderId) async {
     try {
       final response = await http.delete(
-        Uri.parse('$baseUrl/orders/$orderId'),
-        headers: headers,
+        Uri.parse('$_baseUrl/orders/$orderId'),
+        headers: {
+          'Authorization': 'Basic $_authToken',
+          'Content-Type': 'application/json',
+        },
       );
 
       return response.statusCode == 200;
@@ -480,10 +503,13 @@ class PrintfulService {
     try {
       final request = http.MultipartRequest(
         'POST',
-        Uri.parse('$baseUrl/files'),
+        Uri.parse('$_baseUrl/files'),
       );
 
-      request.headers.addAll(headers);
+      request.headers.addAll({
+        'Authorization': 'Basic $_authToken',
+        'Content-Type': 'application/json',
+      });
       request.files.add(await http.MultipartFile.fromPath('file', file.path));
 
       final response = await request.send();
@@ -508,8 +534,11 @@ class PrintfulService {
   }) async {
     try {
       final response = await http.get(
-        Uri.parse('$baseUrl/products/variant/$variantId'),
-        headers: headers,
+        Uri.parse('$_baseUrl/products/variant/$variantId'),
+        headers: {
+          'Authorization': 'Basic $_authToken',
+          'Content-Type': 'application/json',
+        },
       );
 
       if (response.statusCode == 200) {
