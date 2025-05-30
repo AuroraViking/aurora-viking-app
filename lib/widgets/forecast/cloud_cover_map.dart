@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import '../forecast/cloud_time_controls.dart';
 import '../../services/cloud_tile_provider.dart';
 
 class CloudCoverMap extends StatefulWidget {
@@ -60,7 +59,7 @@ class _CloudCoverMapState extends State<CloudCoverMap> {
   @override
   Widget build(BuildContext context) {
     return Container(
-      height: MediaQuery.of(context).size.height * 0.4,
+      height: MediaQuery.of(context).size.height * 0.8,
       margin: const EdgeInsets.only(bottom: 16),
       decoration: BoxDecoration(
         borderRadius: const BorderRadius.only(

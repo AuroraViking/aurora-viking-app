@@ -316,9 +316,13 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
         print('📊 Received ${snapshot.docs.length} sightings from Firebase');
 
         if (mounted) {
-          final sightings = snapshot.docs.map((doc) {
-            return AuroraSighting.fromFirestore(doc);
-          }).toList();
+          final now = DateTime.now();
+          final twelveHoursAgo = now.subtract(const Duration(hours: 12));
+
+          final sightings = snapshot.docs
+              .map((doc) => AuroraSighting.fromFirestore(doc))
+              .where((sighting) => sighting.timestamp.isAfter(twelveHoursAgo))
+              .toList();
 
           setState(() {
             _recentSightings = sightings;
@@ -345,10 +349,10 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
     if (sightings.isEmpty) return 'No Recent Activity';
 
     final now = DateTime.now();
-    final last24Hours = now.subtract(const Duration(hours: 24));
+    final last12Hours = now.subtract(const Duration(hours: 12));
 
     final recentSightings = sightings.where((sighting) {
-      return sighting.timestamp.isAfter(last24Hours);
+      return sighting.timestamp.isAfter(last12Hours);
     }).toList();
 
     final count = recentSightings.length;
@@ -366,17 +370,21 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
     try {
       print('🗺️ Loading nearby sightings...');
 
+      final now = DateTime.now();
+      final twelveHoursAgo = now.subtract(const Duration(hours: 12));
+
       final nearbySightings = await _firebaseService.getNearbyAuroraSightings(
         latitude: _currentLocation!.latitude,
         longitude: _currentLocation!.longitude,
         radiusKm: 100,
-        hours: 24,
+        hours: 12,
       );
 
       if (mounted) {
-        final sightings = nearbySightings.map((doc) {
-          return AuroraSighting.fromFirestore(doc);
-        }).toList();
+        final sightings = nearbySightings
+            .map((doc) => AuroraSighting.fromFirestore(doc))
+            .where((sighting) => sighting.timestamp.isAfter(twelveHoursAgo))
+            .toList();
 
         setState(() {
           _nearbySightings = sightings;
@@ -430,6 +438,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
                   Expanded(
                     child: TabBarView(
                       controller: _tabController,
+                      physics: const NeverScrollableScrollPhysics(),
                       children: [
                         _buildMapView(),
                         _buildSightingsList(_recentSightings, 'recent'),
@@ -462,7 +471,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
       padding: const EdgeInsets.all(16),
       child: Row(
         children: [
-          Text(
+          const Text(
             'Aurora Community',
             style: TextStyle(
               fontSize: 20,
@@ -538,7 +547,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
                   ),
                 ),
                 Text(
-                  '${_recentSightings.length} sightings in last 24h',
+                  '${_recentSightings.length} sightings in last 12h',
                   style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 12,

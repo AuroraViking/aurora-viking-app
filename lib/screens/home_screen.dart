@@ -7,7 +7,6 @@ import 'tour_tab.dart';
 import 'aurora_alerts_tab.dart';
 import 'spot_aurora_screen.dart';
 import '../services/firebase_service.dart';
-import '../services/aurora_message_service.dart';
 import '../widgets/user_badge.dart';
 import 'tour_auth_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -360,7 +359,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _buildNavItem(0, Icons.analytics_outlined, 'Aurora Real Time Data'),
+                          _buildNavItem(0, Icons.analytics_outlined, 'Forecast'),
                           _buildNavItem(1, Icons.satellite_alt, 'Satellite Map'),
                           _buildNavItem(2, Icons.people_outline, 'Community'),
                           _buildNavItem(3, Icons.photo_library_outlined, 'Photos'),

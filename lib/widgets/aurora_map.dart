@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/aurora_sighting.dart';
+import '../services/cloud_tile_provider.dart';
 
 class AuroraMap extends StatefulWidget {
   final Position currentLocation;
@@ -24,11 +25,13 @@ class _AuroraMapState extends State<AuroraMap> {
   GoogleMapController? _mapController;
   Set<Marker> _markers = {};
   Set<Circle> _circles = {};
+  Set<TileOverlay> _tileOverlays = {};
 
   @override
   void initState() {
     super.initState();
     _createMarkers();
+    _createTileOverlays();
   }
 
   @override
@@ -99,6 +102,21 @@ class _AuroraMapState extends State<AuroraMap> {
     setState(() {
       _markers = markers;
       _circles = circles;
+    });
+  }
+
+  void _createTileOverlays() {
+    final TileOverlay cloudOverlay = TileOverlay(
+      tileOverlayId: const TileOverlayId('cloud_overlay'),
+      tileProvider: CloudTileProvider(
+        urlTemplate: 'https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=b7889cba97489be6e2f825f3861feb23',
+        timeOffset: 0,
+      ),
+      transparency: 0.05,
+    );
+
+    setState(() {
+      _tileOverlays = {cloudOverlay};
     });
   }
 
@@ -237,6 +255,7 @@ class _AuroraMapState extends State<AuroraMap> {
           ),
           markers: _markers,
           circles: _circles,
+          tileOverlays: _tileOverlays,
           myLocationEnabled: false, // We have custom current location marker
           myLocationButtonEnabled: false,
           zoomControlsEnabled: false,
@@ -296,16 +315,16 @@ class _AuroraMapState extends State<AuroraMap> {
         crossAxisAlignment: CrossAxisAlignment.start,
         mainAxisSize: MainAxisSize.min,
         children: [
-          Row(
+          const Row(
             mainAxisSize: MainAxisSize.min,
             children: [
-              const Icon(
+              Icon(
                 Icons.info_outline,
                 color: Colors.tealAccent,
                 size: 16,
               ),
-              const SizedBox(width: 6),
-              const Text(
+              SizedBox(width: 6),
+              Text(
                 'Aurora Intensity',
                 style: TextStyle(
                   color: Colors.tealAccent,
