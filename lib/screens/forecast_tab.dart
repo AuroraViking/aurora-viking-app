@@ -1033,11 +1033,52 @@ The chart shows Bz values over time, helping predict aurora activity.''';
   }
 
   Widget _buildSunInfo() {
-    if (_sunData == null) return Container();
+    // Check if astronomical twilight times indicate no darkness
+    final astroStart = _sunData?['astronomicalTwilightStart'] ?? 'N/A';
+    final astroEnd = _sunData?['astronomicalTwilightEnd'] ?? 'N/A';
+    
+    // More robust check for no darkness condition
+    bool isNoDarkness = false;
+    if (astroStart != 'N/A' && astroEnd != 'N/A') {
+      isNoDarkness = (astroStart == '00:00' && astroEnd == '00:00') || 
+                     (astroStart == '0:00' && astroEnd == '0:00') ||
+                     (astroStart == '0:00' && astroEnd == '00:00') ||
+                     (astroStart == '00:00' && astroEnd == '0:00');
+    }
+
+    print('Astro Start: $astroStart, Astro End: $astroEnd, isNoDarkness: $isNoDarkness'); // Debug print
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
+        if (isNoDarkness)
+          Container(
+            margin: const EdgeInsets.only(bottom: 12),
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(8),
+              border: Border.all(
+                color: Colors.red.withOpacity(0.3),
+              ),
+            ),
+            child: Row(
+              children: [
+                Icon(Icons.warning_amber_rounded, color: Colors.red, size: 16),
+                const SizedBox(width: 8),
+                Expanded(
+                  child: Text(
+                    'It will not be dark enough at your location tonight for aurora spotting',
+                    style: TextStyle(
+                      color: Colors.red,
+                      fontSize: 12,
+                      fontStyle: FontStyle.italic,
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
         Row(
           children: [
             Expanded(
@@ -1055,8 +1096,21 @@ The chart shows Bz values over time, helping predict aurora activity.''';
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   _buildDataRow('Day Length', _sunData?['dayLength'] ?? 'N/A', Colors.white70),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDataRow('Astro. Twilight Start', astroStart, Colors.white70),
                   const SizedBox(height: 8),
-                  _buildDataRow('Solar Noon', _sunData?['solarNoon'] ?? 'N/A', Colors.white70),
+                  _buildDataRow('Astro. Twilight End', astroEnd, Colors.white70),
                 ],
               ),
             ),
@@ -1078,7 +1132,7 @@ The chart shows Bz values over time, helping predict aurora activity.''';
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  'Civil Twilight: Dark enough to see the aurora',
+                  'Astronomical Twilight: Dark enough to see the aurora',
                   style: TextStyle(
                     color: Colors.orange,
                     fontSize: 12,
@@ -1123,20 +1177,14 @@ The chart shows Bz values over time, helping predict aurora activity.''';
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 _buildSunInfoSection(
-                  'Civil Twilight',
-                  'Best time for aurora viewing. Sky is dark enough for aurora but still has some ambient light for landscape photography.',
-                  Icons.photo_camera,
-                ),
-                const SizedBox(height: 12),
-                _buildSunInfoSection(
-                  'Solar Noon',
-                  'Sun is at its highest point. Not ideal for aurora viewing due to daylight.',
-                  Icons.highlight,
+                  'Astronomical Twilight',
+                  'When astronomical twilight falls, the sky is dark enough to see the aurora.',
+                  Icons.nightlight_round,
                 ),
                 const SizedBox(height: 12),
                 _buildSunInfoSection(
                   'Day Length',
-                  'Total duration of daylight. Longer days in summer mean shorter aurora viewing windows.',
+                  'Total duration of daylight. In very northern or southern areas, it does not get dark enough in the summer to see the aurora.',
                   Icons.timer,
                 ),
               ],

@@ -6,72 +6,55 @@ class MoonService {
   static const String _baseUrl = 'https://aa.usno.navy.mil/api/rstt/oneday';
 
   Future<Map<String, dynamic>> getMoonData(Position position) async {
-    final now = DateTime.now();
-    final date = '${now.year}-${now.month}-${now.day}';
-    final coords = '${position.latitude}, ${position.longitude}';
-    
-    final url = '$_baseUrl?date=$date&coords=$coords';
-    print('MoonService: Requesting $url');
-    
-    final response = await http.get(Uri.parse(url));
-    print('MoonService: Response status: ${response.statusCode}');
-    print('MoonService: Response body: ${response.body}');
-
-    if (response.statusCode == 200) {
-      final data = json.decode(response.body);
+    try {
+      final date = DateTime.now();
+      final url = 'https://aa.usno.navy.mil/api/rstt/oneday?date=${date.year}-${date.month}-${date.day}&coords=${position.latitude}, ${position.longitude}';
       
-      if (data['error'] != null) {
-        throw Exception('API returned error: ${data['error']}');
-      }
-
-      final moonData = data['properties']['data']['moondata'];
-      final curPhase = data['properties']['data']['curphase'];
-      final fracIllum = data['properties']['data']['fracillum'];
-      final closestPhase = data['properties']['data']['closestphase'];
-
-      // Check for continuous visibility conditions first
-      bool isMoonAlwaysVisible = false;
-      bool isMoonAlwaysHidden = false;
-      String? moonrise;
-      String? moonset;
-
-      for (var phenomenon in moonData) {
-        if (phenomenon['phen'] == 'Object continuously above the Horizon') {
-          isMoonAlwaysVisible = true;
-        } else if (phenomenon['phen'] == 'Object continuously below the Horizon') {
-          isMoonAlwaysHidden = true;
-        } else if (phenomenon['phen'] == 'Moonrise') {
-          moonrise = _formatTime(phenomenon['time']);
-        } else if (phenomenon['phen'] == 'Moonset') {
-          moonset = _formatTime(phenomenon['time']);
+      print('MoonService: Requesting $url');
+      
+      final response = await http.get(Uri.parse(url));
+      print('MoonService: Response status: ${response.statusCode}');
+      print('MoonService: Response body: ${response.body}');
+      
+      if (response.statusCode == 200) {
+        final data = json.decode(response.body);
+        final moonData = data['properties']['data'];
+        
+        // Parse moonrise and moonset times from moondata array
+        String moonrise = 'N/A';
+        String moonset = 'N/A';
+        
+        if (moonData['moondata'] != null) {
+          for (var event in moonData['moondata']) {
+            if (event['phen'] == 'Rise') {
+              moonrise = event['time'] ?? 'N/A';
+            } else if (event['phen'] == 'Set') {
+              moonset = event['time'] ?? 'N/A';
+            }
+          }
         }
-      }
 
-      // Parse the illumination percentage
-      String illumination;
-      try {
-        // Remove the % symbol and parse as double
-        final illumValue = double.parse(fracIllum.replaceAll('%', ''));
-        illumination = illumValue.toStringAsFixed(1);
-      } catch (e) {
-        print('Error parsing illumination: $e');
-        illumination = 'N/A';
+        return {
+          'phase': moonData['curphase'] ?? 'N/A',
+          'illumination': moonData['fracillum'] ?? 'N/A',
+          'moonrise': moonrise,
+          'moonset': moonset,
+          'nextPhase': moonData['closestphase']['phase'] ?? 'N/A',
+          'nextPhaseTime': '${moonData['closestphase']['time']} on ${moonData['closestphase']['month']}/${moonData['closestphase']['day']}/${moonData['closestphase']['year']}',
+        };
+      } else {
+        throw Exception('Failed to load moon data: ${response.statusCode}');
       }
-
+    } catch (e) {
+      print('MoonService: Error fetching moon data: $e');
       return {
-        'moonrise': isMoonAlwaysVisible ? 'Always above horizon' : 
-                   isMoonAlwaysHidden ? 'Always below horizon' : 
-                   moonrise ?? 'N/A',
-        'moonset': isMoonAlwaysVisible ? 'Always above horizon' : 
-                  isMoonAlwaysHidden ? 'Always below horizon' : 
-                  moonset ?? 'N/A',
-        'phase': curPhase,
-        'illumination': illumination,
-        'nextPhase': closestPhase['phase'],
-        'nextPhaseTime': _formatTime(closestPhase['time']),
+        'phase': 'N/A',
+        'illumination': 'N/A',
+        'moonrise': 'N/A',
+        'moonset': 'N/A',
+        'nextPhase': 'N/A',
+        'nextPhaseTime': 'N/A',
       };
-    } else {
-      throw Exception('Failed to load moon data: ${response.statusCode}');
     }
   }
 
