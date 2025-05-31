@@ -179,6 +179,30 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
     final statusColor = AuroraMessageService.getStatusColor(kp, bzH);
     final auroraAdvice = AuroraMessageService.getAuroraAdvice(kp, bzH);
 
+    // Get twilight times
+    final astroStart = _sunData?['astronomicalTwilightStart'] ?? 'N/A';
+    final astroEnd = _sunData?['astronomicalTwilightEnd'] ?? 'N/A';
+    
+    // Check if it will be dark enough
+    bool isNoDarkness = false;
+    if (astroStart != 'N/A' && astroEnd != 'N/A') {
+      isNoDarkness = (astroStart == '00:00' && astroEnd == '00:00') || 
+                     (astroStart == '0:00' && astroEnd == '0:00') ||
+                     (astroStart == '0:00' && astroEnd == '00:00') ||
+                     (astroStart == '00:00' && astroEnd == '0:00');
+    }
+
+    // Create the combined message based on darkness conditions
+    String finalMessage;
+    Color messageColor;
+    if (isNoDarkness) {
+      finalMessage = 'It will not be dark enough at your location tonight for aurora spotting';
+      messageColor = Colors.red;
+    } else {
+      finalMessage = 'Dark enough at $astroStart tonight - $combinedMessage';
+      messageColor = statusColor;
+    }
+
     return Scaffold(
       backgroundColor: Colors.black,
       appBar: AppBar(
@@ -206,60 +230,56 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
             child: Column(
               children: [
                 const SizedBox(height: 16),
-                // Aurora Status Banner
+                // Combined Aurora Status and Advice Box
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(12),
+                  padding: const EdgeInsets.all(16),
                   decoration: BoxDecoration(
                     gradient: LinearGradient(
                       colors: [
-                        statusColor.withOpacity(0.2),
-                        statusColor.withOpacity(0.1),
+                        messageColor.withOpacity(0.2),
+                        messageColor.withOpacity(0.1),
                       ],
                       begin: Alignment.centerLeft,
                       end: Alignment.centerRight,
                     ),
                     borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: statusColor.withOpacity(0.5)),
+                    border: Border.all(color: messageColor.withOpacity(0.5)),
                     boxShadow: [
                       BoxShadow(
-                        color: statusColor.withOpacity(0.3),
+                        color: messageColor.withOpacity(0.3),
                         blurRadius: 15,
                         spreadRadius: 1,
                       ),
                     ],
                   ),
-                  child: Text(
-                    combinedMessage,
-                    style: TextStyle(
-                      color: statusColor,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                      shadows: [
-                        Shadow(color: statusColor.withOpacity(0.5), blurRadius: 10),
+                  child: Column(
+                    children: [
+                      Text(
+                        finalMessage,
+                        style: TextStyle(
+                          color: messageColor,
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                          shadows: [
+                            Shadow(color: messageColor.withOpacity(0.5), blurRadius: 10),
+                          ],
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      if (!isNoDarkness) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          auroraAdvice,
+                          style: TextStyle(
+                            color: Colors.white.withOpacity(0.9),
+                            fontSize: 14,
+                            fontStyle: FontStyle.italic,
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
                       ],
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                ),
-                const SizedBox(height: 12),
-                // Aurora Advice Box
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.6),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: statusColor.withOpacity(0.3)),
-                  ),
-                  child: Text(
-                    auroraAdvice,
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 14,
-                      fontStyle: FontStyle.italic,
-                    ),
-                    textAlign: TextAlign.center,
+                    ],
                   ),
                 ),
                 const SizedBox(height: 16),
