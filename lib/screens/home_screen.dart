@@ -3,14 +3,12 @@ import 'package:flutter/services.dart';
 import 'forecast_tab.dart';
 import 'my_photos_tab.dart';
 import 'print_shop_tab.dart';
-import 'tour_tab.dart';
 import 'aurora_alerts_tab.dart';
 import 'spot_aurora_screen.dart';
 import '../services/firebase_service.dart';
 import '../widgets/user_badge.dart';
 import 'tour_auth_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import 'satellite_map_tab.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -21,7 +19,7 @@ class HomeScreen extends StatefulWidget {
 
 class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   int _selectedIndex = 0;
-  bool _showSpotAuroraFAB = false;
+  bool _showSpotAuroraFAB = true;
   bool _isInitialized = false;
   String? _errorMessage;
 
@@ -127,6 +125,49 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     });
   }
 
+  Widget _buildBody() {
+    switch (_selectedIndex) {
+      case 0:
+        return const ForecastTab();
+      case 1:
+        return const AuroraAlertsTab();
+      case 2:
+        return const MyPhotosTab();
+      case 3:
+        return const PrintShopTab();
+      default:
+        return const ForecastTab();
+    }
+  }
+
+  Widget _buildNavigationBar() {
+    return NavigationBar(
+      selectedIndex: _selectedIndex,
+      onDestinationSelected: (index) {
+        setState(() {
+          _selectedIndex = index;
+        });
+      },
+      destinations: [
+        _buildNavItem(0, Icons.radar, 'Forecast'),
+        _buildNavItem(1, Icons.notifications, 'Aurora Sightings'),
+        _buildNavItem(2, Icons.photo_library, 'Photos'),
+        _buildNavItem(3, Icons.shopping_bag, 'Shop'),
+      ],
+    );
+  }
+
+  Widget _buildNavItem(int index, IconData icon, String label) {
+    final isSelected = _selectedIndex == index;
+    return NavigationDestination(
+      icon: Icon(
+        icon,
+        color: isSelected ? Colors.tealAccent : Colors.white70,
+      ),
+      label: label,
+    );
+  }
+
   Future<void> _onSpotAurora() async {
     try {
       // Navigate to your existing spot aurora screen
@@ -175,23 +216,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       // Restart navigation animation
       _navigationAnimationController.reset();
       _navigationAnimationController.forward();
-    }
-  }
-
-  Widget _buildBody() {
-    switch (_selectedIndex) {
-      case 0:
-        return const ForecastTab();
-      case 1:
-        return const AuroraAlertsTab();
-      case 2:
-        return const MyPhotosTab();
-      case 3:
-        return const PrintShopTab();
-      case 4:
-        return const TourTab();
-      default:
-        return const ForecastTab();
     }
   }
 
@@ -322,63 +346,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                     );
                   },
                 ),
-          bottomNavigationBar: isAuthenticated
-              ? Container(
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
-                      colors: [
-                        Colors.transparent,
-                        const Color(0xFF0A0F1C).withOpacity(0.8),
-                        const Color(0xFF0A0F1C),
-                      ],
-                    ),
-                  ),
-                  child: SafeArea(
-                    child: Container(
-                      height: 80,
-                      margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                      decoration: BoxDecoration(
-                        color: const Color(0xFF1A1F2E).withOpacity(0.9),
-                        borderRadius: BorderRadius.circular(25),
-                        border: Border.all(
-                          color: const Color(0xFF00D4AA).withOpacity(0.3),
-                          width: 1,
-                        ),
-                        boxShadow: [
-                          BoxShadow(
-                            color: const Color(0xFF00D4AA).withOpacity(0.1),
-                            blurRadius: 20,
-                            spreadRadius: 0,
-                          ),
-                        ],
-                      ),
-                      child: Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: [
-                          _buildNavItem(0, Icons.radar, 'Forecast'),
-                          _buildNavItem(1, Icons.satellite_alt, 'Satellite Map'),
-                          _buildNavItem(2, Icons.people_outline, 'Community'),
-                          _buildNavItem(3, Icons.photo_library_outlined, 'Photos'),
-                          _buildNavItem(4, Icons.print_outlined, 'Print'),
-                          _buildNavItem(5, Icons.tour, 'Tour'),
-                        ],
-                      ),
-                    ),
-                  ),
-                )
-              : null,
-          floatingActionButton: isAuthenticated && _showSpotAuroraFAB
-              ? _buildSpotAuroraFAB()
-              : null,
-          floatingActionButtonLocation: FloatingActionButtonLocation.centerFloat,
+          bottomNavigationBar: isAuthenticated ? _buildNavigationBar() : null,
         );
       },
     );
   }
 
-  // Simple FAB widget
   Widget _buildSpotAuroraFAB() {
     return AnimatedBuilder(
       animation: _fabAnimationController,
@@ -412,25 +385,13 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   size: 24,
                 ),
               ),
-              label: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  const Text(
-                    'SPOT AURORA!',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
-                    ),
-                  ),
-                  Text(
-                    _getConditionsText(),
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 11,
-                    ),
-                  ),
-                ],
+              label: const Text(
+                'SPOT AURORA',
+                style: TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                ),
               ),
             ),
           ),
@@ -449,50 +410,5 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } else {
       return 'Aurora possible!';
     }
-  }
-
-  Widget _buildNavItem(int index, IconData icon, String label) {
-    final isSelected = _selectedIndex == index;
-
-    return GestureDetector(
-      onTap: () => _onItemTapped(index),
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 200),
-        padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
-        decoration: BoxDecoration(
-          color: isSelected
-              ? const Color(0xFF00D4AA).withOpacity(0.2)
-              : Colors.transparent,
-          borderRadius: BorderRadius.circular(16),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            AnimatedContainer(
-              duration: const Duration(milliseconds: 200),
-              child: Icon(
-                icon,
-                color: isSelected
-                    ? const Color(0xFF00D4AA)
-                    : Colors.white.withOpacity(0.6),
-                size: isSelected ? 26 : 22,
-              ),
-            ),
-            const SizedBox(height: 4),
-            AnimatedDefaultTextStyle(
-              duration: const Duration(milliseconds: 200),
-              style: TextStyle(
-                color: isSelected
-                    ? const Color(0xFF00D4AA)
-                    : Colors.white.withOpacity(0.6),
-                fontSize: isSelected ? 11 : 10,
-                fontWeight: isSelected ? FontWeight.w600 : FontWeight.w400,
-              ),
-              child: Text(label),
-            ),
-          ],
-        ),
-      ),
-    );
   }
 }
