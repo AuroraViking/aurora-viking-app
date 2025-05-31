@@ -7,7 +7,6 @@ import 'tour_tab.dart';
 import 'aurora_alerts_tab.dart';
 import 'spot_aurora_screen.dart';
 import '../services/firebase_service.dart';
-import '../services/aurora_message_service.dart';
 import '../widgets/user_badge.dart';
 import 'tour_auth_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -184,14 +183,12 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       case 0:
         return const ForecastTab();
       case 1:
-        return const SatelliteMapTab();
-      case 2:
         return const AuroraAlertsTab();
-      case 3:
+      case 2:
         return const MyPhotosTab();
-      case 4:
+      case 3:
         return const PrintShopTab();
-      case 5:
+      case 4:
         return const TourTab();
       default:
         return const ForecastTab();
