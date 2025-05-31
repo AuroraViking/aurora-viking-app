@@ -20,7 +20,8 @@ class ForecastTab extends StatefulWidget {
   State<ForecastTab> createState() => _ForecastTabState();
 }
 
-class _ForecastTabState extends State<ForecastTab> {
+class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStateMixin {
+  late TabController _tabController;
   List<double> bzValues = [];
   List<String> times = [];
   double kp = 0.0;
@@ -47,8 +48,15 @@ class _ForecastTabState extends State<ForecastTab> {
   @override
   void initState() {
     super.initState();
+    _tabController = TabController(length: 2, vsync: this);
     _loadData();
     _loadCloudCoverData();
+  }
+
+  @override
+  void dispose() {
+    _tabController.dispose();
+    super.dispose();
   }
 
   Future<void> _loadCloudCoverData() async {
@@ -173,460 +181,357 @@ class _ForecastTabState extends State<ForecastTab> {
 
     return Scaffold(
       backgroundColor: Colors.black,
-      body: SingleChildScrollView(
-        child: Column(
-          children: [
-            const SizedBox(height: 16),
-
-            // Header
-            const Text(
-              'Aurora Forecast',
-              style: TextStyle(
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
-                color: Colors.tealAccent,
-                shadows: [Shadow(color: Colors.tealAccent, blurRadius: 8)],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Aurora Status Banner
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  colors: [
-                    statusColor.withOpacity(0.2),
-                    statusColor.withOpacity(0.1),
-                  ],
-                  begin: Alignment.centerLeft,
-                  end: Alignment.centerRight,
-                ),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: statusColor.withOpacity(0.5)),
-                boxShadow: [
-                  BoxShadow(
-                    color: statusColor.withOpacity(0.3),
-                    blurRadius: 15,
-                    spreadRadius: 1,
-                  ),
-                ],
-              ),
-              child: Text(
-                combinedMessage,
-                style: TextStyle(
-                  color: statusColor,
-                  fontSize: 16,
-                  fontWeight: FontWeight.bold,
-                  shadows: [
-                    Shadow(color: statusColor.withOpacity(0.5), blurRadius: 10),
-                  ],
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-
-            const SizedBox(height: 12),
-
-            // Aurora Advice Box
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.6),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: statusColor.withOpacity(0.3)),
-              ),
-              child: Text(
-                auroraAdvice,
-                style: TextStyle(
-                  color: Colors.white.withOpacity(0.9),
-                  fontSize: 14,
-                  fontStyle: FontStyle.italic,
-                ),
-                textAlign: TextAlign.center,
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Info Box
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.tealAccent.withOpacity(0.1),
-                    Colors.cyanAccent.withOpacity(0.05),
-                    Colors.black.withOpacity(0.8),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.tealAccent.withOpacity(0.6),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.tealAccent.withOpacity(0.2),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Row(
-                children: [
-                  // Left column
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildDataRow('BzH', '$bzH nT', Colors.tealAccent, isHighlighted: true),
-                        const SizedBox(height: 8),
-                        _buildDataRow('Kp Index', kp.toStringAsFixed(1), Colors.white),
-                        const SizedBox(height: 8),
-                        _buildDataRow('Speed', '${speed.toInt()} km/s', Colors.white70),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  // Right column
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        _buildDataRow('Density', '${density.toStringAsFixed(1)} /cm³', Colors.white70),
-                        const SizedBox(height: 8),
-                        Row(
-                          children: [
-                            Icon(Icons.update, color: Colors.grey, size: 14),
-                            const SizedBox(width: 4),
-                            Text(
-                              'Live Data',
-                              style: TextStyle(
-                                color: Colors.grey,
-                                fontSize: 11,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Chart with fixed height
-            SizedBox(
-              height: 500, // Increased height for chart
-              child: ForecastChartWidget(
-                bzValues: bzValues,
-                times: times,
-                kp: kp,
-                speed: speed,
-                density: density,
-              ),
-            ),
-
-            const SizedBox(height: 20),
-
-            // 5-Day Kp Forecast Section
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.schedule, color: Colors.tealAccent, size: 20),
-                      const SizedBox(width: 8),
-                      Text(
-                        '5-Day Kp Forecast',
-                        style: TextStyle(
-                          fontSize: 18,
-                          fontWeight: FontWeight.bold,
-                          color: Colors.tealAccent,
-                          shadows: [Shadow(color: Colors.tealAccent, blurRadius: 8)],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  _buildKpForecastList(),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 20), // Bottom padding for scroll
-
-            // Moon Info
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.tealAccent.withOpacity(0.1),
-                    Colors.cyanAccent.withOpacity(0.05),
-                    Colors.black.withOpacity(0.8),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.tealAccent.withOpacity(0.6),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.tealAccent.withOpacity(0.2),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.nightlight_round, color: Colors.tealAccent, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Moon Info',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.tealAccent,
-                                shadows: [Shadow(color: Colors.tealAccent, blurRadius: 8)],
-                              ),
-                            ),
-                            Text(
-                              _formatLocation(_currentPosition),
-                              style: TextStyle(
-                                color: Colors.tealAccent.withOpacity(0.7),
-                                fontSize: 12,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                      GestureDetector(
-                        onTap: () => _showMoonInfoHelp(context),
-                        child: Icon(
-                          Icons.help_outline,
-                          color: Colors.tealAccent,
-                          size: 20,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildDataRow('Phase', _moonData?['phase'] ?? 'N/A', Colors.white),
-                            const SizedBox(height: 8),
-                            _buildDataRow('Illumination', '${_moonData?['illumination'] ?? 'N/A'}%', Colors.white70),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildDataRow('Moonrise', _moonData?['moonrise'] ?? 'N/A', Colors.white70),
-                            const SizedBox(height: 8),
-                            _buildDataRow('Moonset', _moonData?['moonset'] ?? 'N/A', Colors.white70),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 8),
-                  Container(
-                    padding: const EdgeInsets.all(8),
-                    decoration: BoxDecoration(
-                      color: Colors.tealAccent.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(
-                        color: Colors.tealAccent.withOpacity(0.3),
-                      ),
-                    ),
-                    child: Row(
-                      children: [
-                        Icon(Icons.info_outline, color: Colors.tealAccent, size: 16),
-                        const SizedBox(width: 8),
-                        Expanded(
-                          child: Text(
-                            'Next Phase: ${_moonData?['nextPhase'] ?? 'N/A'} at ${_moonData?['nextPhaseTime'] ?? 'N/A'}',
-                            style: TextStyle(
-                              color: Colors.tealAccent,
-                              fontSize: 12,
-                              fontStyle: FontStyle.italic,
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ],
-              ),
-            ),
-
-            const SizedBox(height: 16),
-
-            // Sun and Twilight Info
-            Container(
-              margin: const EdgeInsets.symmetric(horizontal: 16),
-              padding: const EdgeInsets.all(16),
-              decoration: BoxDecoration(
-                gradient: LinearGradient(
-                  begin: Alignment.topLeft,
-                  end: Alignment.bottomRight,
-                  colors: [
-                    Colors.tealAccent.withOpacity(0.1),
-                    Colors.cyanAccent.withOpacity(0.05),
-                    Colors.black.withOpacity(0.8),
-                  ],
-                ),
-                borderRadius: BorderRadius.circular(16),
-                border: Border.all(
-                  color: Colors.tealAccent.withOpacity(0.6),
-                  width: 1.5,
-                ),
-                boxShadow: [
-                  BoxShadow(
-                    color: Colors.tealAccent.withOpacity(0.2),
-                    blurRadius: 20,
-                    spreadRadius: 2,
-                  ),
-                  BoxShadow(
-                    color: Colors.black.withOpacity(0.5),
-                    blurRadius: 10,
-                    offset: const Offset(0, 4),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Icon(Icons.wb_twilight, color: Colors.tealAccent, size: 20),
-                      const SizedBox(width: 8),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Text(
-                              'Sun and Twilight Info',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.tealAccent,
-                                shadows: [Shadow(color: Colors.tealAccent, blurRadius: 8)],
-                              ),
-                            ),
-                            Text(
-                              _formatLocation(_currentPosition),
-                              style: TextStyle(
-                                color: Colors.tealAccent.withOpacity(0.7),
-                                fontSize: 12,
-                                fontStyle: FontStyle.italic,
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildDataRow('Sunrise', _sunData?['sunrise'] ?? 'N/A', Colors.white),
-                            const SizedBox(height: 8),
-                            _buildDataRow('Sunset', _sunData?['sunset'] ?? 'N/A', Colors.white),
-                          ],
-                        ),
-                      ),
-                      Expanded(
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            _buildDataRow('Day Length', _sunData?['dayLength'] ?? 'N/A', Colors.white70),
-                          ],
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 12),
-                  Container(
-                    padding: const EdgeInsets.all(12),
-                    decoration: BoxDecoration(
-                      color: Colors.tealAccent.withOpacity(0.1),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.tealAccent.withOpacity(0.3),
-                      ),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          'Astronomical Twilight',
-                          style: TextStyle(
-                            color: Colors.tealAccent,
-                            fontSize: 14,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildDataRow('Start', _sunData?['astronomicalTwilightStart'] ?? 'N/A', Colors.white70),
-                        const SizedBox(height: 4),
-                        _buildDataRow('End', _sunData?['astronomicalTwilightEnd'] ?? 'N/A', Colors.white70),
-                      ],
-                    ),
-                  ),
-                  const SizedBox(height: 12),
-                  _buildTwilightConditionInfo(_sunData),
-                ],
-              ),
-            ),
-          ],
+      appBar: AppBar(
+        backgroundColor: Colors.black,
+        toolbarHeight: 0,
+        bottom: PreferredSize(
+          preferredSize: const Size.fromHeight(48),
+          child: TabBar(
+            controller: _tabController,
+            indicatorColor: Colors.tealAccent,
+            labelColor: Colors.tealAccent,
+            unselectedLabelColor: Colors.white70,
+            tabs: const [
+              Tab(text: 'Nowcast'),
+              Tab(text: 'Forecast'),
+            ],
+          ),
         ),
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        children: [
+          // Nowcast Tab
+          SingleChildScrollView(
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                // Aurora Status Banner
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      colors: [
+                        statusColor.withOpacity(0.2),
+                        statusColor.withOpacity(0.1),
+                      ],
+                      begin: Alignment.centerLeft,
+                      end: Alignment.centerRight,
+                    ),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: statusColor.withOpacity(0.5)),
+                    boxShadow: [
+                      BoxShadow(
+                        color: statusColor.withOpacity(0.3),
+                        blurRadius: 15,
+                        spreadRadius: 1,
+                      ),
+                    ],
+                  ),
+                  child: Text(
+                    combinedMessage,
+                    style: TextStyle(
+                      color: statusColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                      shadows: [
+                        Shadow(color: statusColor.withOpacity(0.5), blurRadius: 10),
+                      ],
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                // Aurora Advice Box
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.6),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(color: statusColor.withOpacity(0.3)),
+                  ),
+                  child: Text(
+                    auroraAdvice,
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 14,
+                      fontStyle: FontStyle.italic,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Data Box
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.tealAccent.withOpacity(0.1),
+                        Colors.cyanAccent.withOpacity(0.05),
+                        Colors.black.withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.tealAccent.withOpacity(0.6),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.tealAccent.withOpacity(0.2),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.speed, color: Colors.tealAccent),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Current Conditions',
+                                style: TextStyle(
+                                  color: Colors.tealAccent,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 16),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildDataRow('BzH', bzH.toStringAsFixed(2), Colors.white, isHighlighted: true),
+                                const SizedBox(height: 8),
+                                _buildDataRow('Kp Index', kp.toStringAsFixed(1), Colors.white70),
+                              ],
+                            ),
+                          ),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                _buildDataRow('Speed', '${speed.toStringAsFixed(0)} km/s', Colors.white70),
+                                const SizedBox(height: 8),
+                                _buildDataRow('Density', '${density.toStringAsFixed(1)} p/cm³', Colors.white70),
+                              ],
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                // Chart with fixed height
+                SizedBox(
+                  height: 500,
+                  child: ForecastChartWidget(
+                    bzValues: bzValues,
+                    times: times,
+                    kp: kp,
+                    speed: speed,
+                    density: density,
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Satellite Map
+                if (_cloudCoverData != null)
+                  CloudCoverMap(
+                    position: _currentPosition!,
+                    cloudCover: (_cloudCoverData!['cloudCover'] ?? 0).toDouble(),
+                    weatherDescription: _weatherData?['description'] ?? 'N/A',
+                    weatherIcon: _weatherData?['icon'] ?? 'N/A',
+                  ),
+                const SizedBox(height: 20),
+                // Sun/Daylight Info
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.orange.withOpacity(0.1),
+                        Colors.amber.withOpacity(0.05),
+                        Colors.black.withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.orange.withOpacity(0.6),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.orange.withOpacity(0.2),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.wb_sunny, color: Colors.orange),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Sun & Daylight',
+                                style: TextStyle(
+                                  color: Colors.orange,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.help_outline, color: Colors.orange),
+                            onPressed: () => _showSunInfoHelp(context),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildSunInfo(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
+                // Moon Info
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topLeft,
+                      end: Alignment.bottomRight,
+                      colors: [
+                        Colors.tealAccent.withOpacity(0.1),
+                        Colors.cyanAccent.withOpacity(0.05),
+                        Colors.black.withOpacity(0.8),
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(16),
+                    border: Border.all(
+                      color: Colors.tealAccent.withOpacity(0.6),
+                      width: 1.5,
+                    ),
+                    boxShadow: [
+                      BoxShadow(
+                        color: Colors.tealAccent.withOpacity(0.2),
+                        blurRadius: 20,
+                        spreadRadius: 2,
+                      ),
+                      BoxShadow(
+                        color: Colors.black.withOpacity(0.5),
+                        blurRadius: 10,
+                        offset: const Offset(0, 4),
+                      ),
+                    ],
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                        children: [
+                          Row(
+                            children: [
+                              Icon(Icons.nightlight_round, color: Colors.tealAccent),
+                              const SizedBox(width: 8),
+                              Text(
+                                'Moon Phase',
+                                style: TextStyle(
+                                  color: Colors.tealAccent,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ],
+                          ),
+                          IconButton(
+                            icon: Icon(Icons.help_outline, color: Colors.tealAccent),
+                            onPressed: () => _showMoonInfoHelp(context),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildMoonInfo(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          // Forecast Tab
+          SingleChildScrollView(
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
+                // 5-Day Kp Forecast Section
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.schedule, color: Colors.tealAccent, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            '5-Day Kp Forecast',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.tealAccent,
+                              shadows: [Shadow(color: Colors.tealAccent, blurRadius: 8)],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildKpForecastList(),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -772,6 +677,67 @@ class _ForecastTabState extends State<ForecastTab> {
     );
   }
 
+  Widget _buildMoonInfo() {
+    if (_moonData == null) return Container();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDataRow('Phase', _moonData?['phase'] ?? 'N/A', Colors.white),
+                  const SizedBox(height: 8),
+                  _buildDataRow('Illumination', '${_moonData?['illumination'] ?? 'N/A'}%', Colors.white70),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDataRow('Moonrise', _moonData?['moonrise'] ?? 'N/A', Colors.white70),
+                  const SizedBox(height: 8),
+                  _buildDataRow('Moonset', _moonData?['moonset'] ?? 'N/A', Colors.white70),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.tealAccent.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Colors.tealAccent.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.tealAccent, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Next Phase: ${_moonData?['nextPhase'] ?? 'N/A'} at ${_moonData?['nextPhaseTime'] ?? 'N/A'}',
+                  style: TextStyle(
+                    color: Colors.tealAccent,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
   Widget _buildDataRow(String label, String value, Color color, {bool isHighlighted = false}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
@@ -845,89 +811,6 @@ class _ForecastTabState extends State<ForecastTab> {
         ),
       ],
     );
-  }
-
-  Widget _buildTwilightConditionInfo(Map<String, dynamic>? sunData) {
-    final twilightStart = sunData?['astronomicalTwilightStart'];
-    final twilightEnd = sunData?['astronomicalTwilightEnd'];
-    
-    // Format the time first to check if it's valid
-    String formattedTime = _formatTwilightTime(twilightStart);
-    
-    // Check if we have a valid time (not N/A)
-    bool hasValidTwilight = formattedTime != 'N/A';
-    
-    String message;
-    Color messageColor;
-
-    if (!hasValidTwilight) {
-      message = 'Not dark enough tonight to spot aurora. Northern places see the midnight sun in summer.';
-      messageColor = Colors.redAccent;
-    } else {
-      message = 'It will be dark enough for aurora spotting starting at $formattedTime.';
-      messageColor = Colors.greenAccent;
-    }
-
-    return Container(
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        color: messageColor.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(
-          color: messageColor.withOpacity(0.3),
-        ),
-      ),
-      child: Row(
-        children: [
-          Icon(
-            hasValidTwilight ? Icons.visibility : Icons.visibility_off,
-            color: messageColor,
-            size: 20,
-          ),
-          const SizedBox(width: 8),
-          Expanded(
-            child: Text(
-              message,
-              style: TextStyle(
-                color: messageColor,
-                fontSize: 14,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  String _formatTwilightTime(String? isoString) {
-    // Check for all invalid cases first
-    if (isoString == null || 
-        isoString == '00:00' || 
-        isoString == '1970-01-01T00:00:01+00:00' ||
-        isoString == 'N/A' ||
-        isoString.isEmpty) {
-      return 'N/A';
-    }
-    try {
-      // Parse ISO string and convert to local time
-      final dt = DateTime.parse(isoString).toLocal();
-      // Additional validation for midnight
-      if (dt.hour == 0 && dt.minute == 0) {
-        return 'N/A';
-      }
-      final hour = dt.hour % 12 == 0 ? 12 : dt.hour % 12;
-      final minute = dt.minute.toString().padLeft(2, '0');
-      final period = dt.hour >= 12 ? 'PM' : 'AM';
-      return '$hour:$minute $period';
-    } catch (e) {
-      return 'N/A';
-    }
-  }
-
-  String _formatLocation(Position? position) {
-    if (position == null) return 'N/A';
-    return '${position.latitude.toStringAsFixed(2)}°N, ${position.longitude.toStringAsFixed(2)}°E';
   }
 
   void _showMoonInfoHelp(BuildContext context) {
@@ -1146,6 +1029,172 @@ The chart shows Bz values over time, helping predict aurora activity.''';
           ],
         );
       },
+    );
+  }
+
+  Widget _buildSunInfo() {
+    if (_sunData == null) return Container();
+
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          children: [
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDataRow('Sunrise', _sunData?['sunrise'] ?? 'N/A', Colors.white),
+                  const SizedBox(height: 8),
+                  _buildDataRow('Sunset', _sunData?['sunset'] ?? 'N/A', Colors.white70),
+                ],
+              ),
+            ),
+            Expanded(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildDataRow('Day Length', _sunData?['dayLength'] ?? 'N/A', Colors.white70),
+                  const SizedBox(height: 8),
+                  _buildDataRow('Solar Noon', _sunData?['solarNoon'] ?? 'N/A', Colors.white70),
+                ],
+              ),
+            ),
+          ],
+        ),
+        const SizedBox(height: 8),
+        Container(
+          padding: const EdgeInsets.all(8),
+          decoration: BoxDecoration(
+            color: Colors.orange.withOpacity(0.1),
+            borderRadius: BorderRadius.circular(8),
+            border: Border.all(
+              color: Colors.orange.withOpacity(0.3),
+            ),
+          ),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.orange, size: 16),
+              const SizedBox(width: 8),
+              Expanded(
+                child: Text(
+                  'Civil Twilight: Dark enough to see the aurora',
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontSize: 12,
+                    fontStyle: FontStyle.italic,
+                  ),
+                ),
+              ),
+            ],
+          ),
+        ),
+      ],
+    );
+  }
+
+  void _showSunInfoHelp(BuildContext context) {
+    showDialog(
+      context: context,
+      builder: (BuildContext context) {
+        return AlertDialog(
+          backgroundColor: Colors.black.withOpacity(0.9),
+          shape: RoundedRectangleBorder(
+            borderRadius: BorderRadius.circular(16),
+            side: BorderSide(color: Colors.orange.withOpacity(0.5)),
+          ),
+          title: Row(
+            children: [
+              Icon(Icons.wb_sunny, color: Colors.orange),
+              const SizedBox(width: 8),
+              Text(
+                'Sun & Daylight Guide',
+                style: TextStyle(
+                  color: Colors.orange,
+                  fontSize: 18,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ],
+          ),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                _buildSunInfoSection(
+                  'Civil Twilight',
+                  'Best time for aurora viewing. Sky is dark enough for aurora but still has some ambient light for landscape photography.',
+                  Icons.photo_camera,
+                ),
+                const SizedBox(height: 12),
+                _buildSunInfoSection(
+                  'Solar Noon',
+                  'Sun is at its highest point. Not ideal for aurora viewing due to daylight.',
+                  Icons.highlight,
+                ),
+                const SizedBox(height: 12),
+                _buildSunInfoSection(
+                  'Day Length',
+                  'Total duration of daylight. Longer days in summer mean shorter aurora viewing windows.',
+                  Icons.timer,
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text(
+                'Close',
+                style: TextStyle(color: Colors.orange),
+              ),
+            ),
+          ],
+        );
+      },
+    );
+  }
+
+  Widget _buildSunInfoSection(String title, String description, IconData icon) {
+    return Container(
+      padding: const EdgeInsets.all(8),
+      decoration: BoxDecoration(
+        color: Colors.orange.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(8),
+        border: Border.all(
+          color: Colors.orange.withOpacity(0.3),
+        ),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(icon, color: Colors.orange, size: 20),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  title,
+                  style: TextStyle(
+                    color: Colors.orange,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                const SizedBox(height: 4),
+                Text(
+                  description,
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
     );
   }
 }

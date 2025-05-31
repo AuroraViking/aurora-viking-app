@@ -360,7 +360,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                       child: Row(
                         mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                         children: [
-                          _buildNavItem(0, Icons.analytics_outlined, 'Aurora Real Time Data'),
+                          _buildNavItem(0, Icons.radar, 'Forecast'),
                           _buildNavItem(1, Icons.satellite_alt, 'Satellite Map'),
                           _buildNavItem(2, Icons.people_outline, 'Community'),
                           _buildNavItem(3, Icons.photo_library_outlined, 'Photos'),
