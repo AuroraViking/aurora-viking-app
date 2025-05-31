@@ -10,7 +10,7 @@ class BokunService {
   static const String _baseUrl = 'https://api.bokun.io/v1';
 
   // Generate HMAC-SHA1 signature for Bokun API authentication
-  String _generateSignature(String date, String path) {
+  static String _generateSignature(String date, String path) {
     final key = utf8.encode(_secretKey);
     final message = utf8.encode('$date\n$path');
     final hmac = Hmac(sha1, key);
@@ -19,7 +19,7 @@ class BokunService {
   }
 
   // Get authentication headers for Bokun API
-  Map<String, String> _getAuthHeaders(String path) {
+  static Map<String, String> _getAuthHeaders(String path) {
     // Format date as 'yyyy-MM-dd HH:mm:ss'
     final now = DateTime.now().toUtc();
     final date = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
@@ -138,21 +138,7 @@ class BokunService {
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
-        final order = data['order'] ?? {};
-        final product = order['product'] ?? {};
-        final pickup = order['pickup'] ?? {};
-        
-        return {
-          'bookingReference': bookingReference,
-          'status': order['status'] ?? 'unknown',
-          'pickupLocation': pickup['location']?['name'] ?? 'TBD',
-          'pickupTime': pickup['time'] ?? 'TBD',
-          'duration': product['duration'] ?? 'TBD',
-          'groupSize': '${order['numberOfTravelers'] ?? 0} people',
-          'price': '${order['totalPrice'] ?? 0} ${order['currency'] ?? 'EUR'}',
-          'currency': order['currency'] ?? 'EUR',
-          'cancellationPolicy': product['cancellationPolicy'] ?? 'Contact for details',
-        };
+        return _processBookingData(data);
       } else {
         print('Failed to fetch tour details: ${response.statusCode} - ${response.body}');
         throw Exception('Failed to fetch tour details: ${response.statusCode}');
@@ -168,7 +154,7 @@ class BokunService {
       print('🔍 Verifying email: $email');
       
       // First try to verify using the booking reference
-      final bookingRef = 'AUR-65391772'; // Using the provided booking reference
+      const bookingRef = 'AUR-65391772'; // Using the provided booking reference
       print('🔑 Checking booking reference: $bookingRef');
       
       final response = await http.get(
@@ -207,7 +193,43 @@ class BokunService {
     }
   }
 
-  Future<Map<String, dynamic>?> verifyBookingReference(String reference) async {
+  // Test API connection
+  static Future<bool> testApiConnection() async {
+    try {
+      final response = await http.get(
+        Uri.parse('$_baseUrl/orders'),
+        headers: _getAuthHeaders('/orders'),
+      );
+      return response.statusCode == 200;
+    } catch (e) {
+      print('Error testing API connection: $e');
+      return false;
+    }
+  }
+
+  // Get variations of a booking reference
+  static List<String> getBookingReferenceVariations(String reference) {
+    final variations = <String>[];
+    final cleanRef = reference.trim().toUpperCase();
+    
+    // Add original reference
+    variations.add(cleanRef);
+    
+    // Add variations with different separators
+    if (cleanRef.contains('-')) {
+      variations.add(cleanRef.replaceAll('-', ''));
+    } else {
+      // Try to add hyphens in common patterns
+      if (cleanRef.length >= 8) {
+        variations.add('${cleanRef.substring(0, 3)}-${cleanRef.substring(3)}');
+      }
+    }
+    
+    return variations;
+  }
+
+  // Make verifyBookingReference static
+  static Future<Map<String, dynamic>?> verifyBookingReference(String reference) async {
     try {
       print('🔍 Verifying booking reference: $reference');
       
@@ -266,5 +288,23 @@ class BokunService {
       print('❌ Error verifying booking: $e');
       return null;
     }
+  }
+
+  Map<String, dynamic> _processBookingData(Map<dynamic, dynamic> data) {
+    final order = (data['order'] as Map<dynamic, dynamic>?)?.cast<String, dynamic>() ?? {};
+    final product = (order['product'] as Map<dynamic, dynamic>?)?.cast<String, dynamic>() ?? {};
+    final pickup = (order['pickup'] as Map<dynamic, dynamic>?)?.cast<String, dynamic>() ?? {};
+    
+    return {
+      'bookingReference': data['reference']?.toString() ?? '',
+      'status': order['status']?.toString() ?? 'unknown',
+      'pickupLocation': ((pickup['location'] as Map<dynamic, dynamic>?)?.cast<String, dynamic>())?['name']?.toString() ?? 'TBD',
+      'pickupTime': pickup['time']?.toString() ?? 'TBD',
+      'duration': product['duration']?.toString() ?? 'TBD',
+      'groupSize': '${order['numberOfTravelers'] ?? 0} people',
+      'price': '${order['totalPrice'] ?? 0} ${order['currency'] ?? 'EUR'}',
+      'currency': order['currency']?.toString() ?? 'EUR',
+      'cancellationPolicy': product['cancellationPolicy']?.toString() ?? 'Contact for details',
+    };
   }
 } 

@@ -1,7 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
-import '../forecast/cloud_time_controls.dart';
 import '../../services/cloud_tile_provider.dart';
 
 class CloudCoverMap extends StatefulWidget {

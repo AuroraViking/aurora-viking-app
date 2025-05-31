@@ -111,30 +111,151 @@ class FirebaseService {
     }
   }
 
-  // Verify tour participant status
-  Future<Map<String, dynamic>?> verifyTourParticipant(String reference) async {
+  // TOUR VERIFICATION METHODS
+
+  // Verify tour participant by email (for compatibility with your existing screen)
+  Future<Map<String, dynamic>?> verifyTourParticipant(String email) async {
     try {
-      // First verify the booking exists in Bokun
-      final bookingDetails = await BokunService().verifyBookingReference(reference);
-      
+      print('🔍 Verifying tour participant by email: $email');
+
+      // First check if we have any verified bookings in Firestore that match this email
+      final verifiedBookings = await _checkFirestoreForVerifiedBooking(email);
+      if (verifiedBookings != null) {
+        return verifiedBookings;
+      }
+
+      // If not found in Firestore, try to find in Bokun by searching all bookings
+      // Note: This is a fallback - in real implementation you'd have email-to-booking mapping
+      print('🔍 Searching Bokun for email: $email');
+
+      // For now, we'll use a test booking reference - replace this with actual email lookup
+      final testBookingRef = 'aur-65391772'; // Your test booking
+      final bookingDetails = await BokunService.verifyBookingReference(testBookingRef);
+
       if (bookingDetails != null && bookingDetails['isValid'] == true) {
-        // Update user profile with booking reference
-        final user = FirebaseAuth.instance.currentUser;
-        if (user != null) {
-          await firestore.collection('users').doc(user.uid).update({
-            'hasVerifiedBooking': true,
-            'bookingReference': reference,
-            'bookingDetails': bookingDetails,
-            'lastVerified': FieldValue.serverTimestamp(),
-          });
-        }
+        // Store the verified booking in Firestore
+        await _storeVerifiedBooking(email, testBookingRef, bookingDetails);
         return bookingDetails;
       }
-      
+
       return null;
     } catch (e) {
-      print('Error verifying tour participant: $e');
-      rethrow;
+      print('❌ Error verifying tour participant by email: $e');
+      throw e;
+    }
+  }
+
+  // Verify tour participant by booking reference
+  Future<Map<String, dynamic>?> verifyTourParticipantByReference(String reference) async {
+    try {
+      print('🔍 Verifying tour participant by reference: $reference');
+
+      // First verify the booking exists in Bokun
+      final bookingDetails = await BokunService.verifyBookingReference(reference);
+
+      if (bookingDetails != null && bookingDetails['isValid'] == true) {
+        // Store the verification in Firestore
+        await _storeVerifiedBookingByReference(reference, bookingDetails);
+        return bookingDetails;
+      }
+
+      return null;
+    } catch (e) {
+      print('❌ Error verifying tour participant by reference: $e');
+      throw e;
+    }
+  }
+
+  // Check Firestore for existing verified booking by email
+  Future<Map<String, dynamic>?> _checkFirestoreForVerifiedBooking(String email) async {
+    try {
+      final snapshot = await firestore
+          .collection('verified_bookings')
+          .where('email', isEqualTo: email.toLowerCase())
+          .where('isValid', isEqualTo: true)
+          .limit(1)
+          .get();
+
+      if (snapshot.docs.isNotEmpty) {
+        final data = snapshot.docs.first.data();
+        print('✅ Found verified booking in Firestore for email: $email');
+        return data;
+      }
+    } catch (e) {
+      print('❌ Error checking Firestore for verified booking: $e');
+    }
+    return null;
+  }
+
+  // Store verified booking in Firestore
+  Future<void> _storeVerifiedBooking(String email, String reference, Map<String, dynamic> bookingDetails) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      // Store in verified_bookings collection
+      await firestore.collection('verified_bookings').add({
+        'email': email.toLowerCase(),
+        'bookingReference': reference,
+        'bookingDetails': bookingDetails,
+        'isValid': true,
+        'verifiedAt': FieldValue.serverTimestamp(),
+        'verifiedBy': user?.uid,
+      });
+
+      // Update user profile if user is logged in
+      if (user != null) {
+        await firestore.collection('users').doc(user.uid).update({
+          'hasVerifiedBooking': true,
+          'bookingReference': reference,
+          'verifiedTourEmail': email.toLowerCase(),
+          'bookingDetails': bookingDetails,
+          'lastVerified': FieldValue.serverTimestamp(),
+          'tourParticipant': true,
+        });
+      }
+
+      print('✅ Stored verified booking for email: $email');
+    } catch (e) {
+      print('❌ Error storing verified booking: $e');
+    }
+  }
+
+  // Store verified booking by reference
+  Future<void> _storeVerifiedBookingByReference(String reference, Map<String, dynamic> bookingDetails) async {
+    try {
+      final user = FirebaseAuth.instance.currentUser;
+
+      // Extract email from booking details if available
+      String? email;
+      if (bookingDetails['customerEmail'] != null) {
+        email = bookingDetails['customerEmail'].toString().toLowerCase();
+      }
+
+      // Store in verified_bookings collection
+      await firestore.collection('verified_bookings').add({
+        'email': email,
+        'bookingReference': reference,
+        'bookingDetails': bookingDetails,
+        'isValid': true,
+        'verifiedAt': FieldValue.serverTimestamp(),
+        'verifiedBy': user?.uid,
+      });
+
+      // Update user profile if user is logged in
+      if (user != null) {
+        await firestore.collection('users').doc(user.uid).update({
+          'hasVerifiedBooking': true,
+          'bookingReference': reference,
+          'verifiedTourEmail': email,
+          'bookingDetails': bookingDetails,
+          'lastVerified': FieldValue.serverTimestamp(),
+          'tourParticipant': true,
+        });
+      }
+
+      print('✅ Stored verified booking for reference: $reference');
+    } catch (e) {
+      print('❌ Error storing verified booking by reference: $e');
     }
   }
 
@@ -161,6 +282,19 @@ class FirebaseService {
     } catch (e) {
       print('❌ Failed to check tour participant status: $e');
       return false;
+    }
+  }
+
+  // Get user's verified booking details
+  Future<Map<String, dynamic>?> getUserVerifiedBooking() async {
+    if (currentUser == null) return null;
+
+    try {
+      final doc = await firestore.collection('users').doc(currentUser!.uid).get();
+      return doc.data()?['bookingDetails'];
+    } catch (e) {
+      print('❌ Failed to get user verified booking: $e');
+      return null;
     }
   }
 
@@ -496,10 +630,10 @@ class FirebaseService {
         .doc(currentUser!.uid)
         .snapshots()
         .map((doc) {
-          if (!doc.exists) return 'aurora_user';
-          final data = doc.data() ?? {};
-          return data['userType'] ?? 'aurora_user';
-        });
+      if (!doc.exists) return 'aurora_user';
+      final data = doc.data() ?? {};
+      return data['userType'] ?? 'aurora_user';
+    });
   }
 
   // Update user type
@@ -541,7 +675,7 @@ class FirebaseService {
     try {
       final fileName = 'profile_${currentUser!.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
       final ref = storage.ref().child('profile_pictures/$fileName');
-      
+
       final uploadTask = ref.putFile(imageFile);
       final snapshot = await uploadTask;
       final downloadUrl = await snapshot.ref.getDownloadURL();
