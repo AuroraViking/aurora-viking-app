@@ -13,13 +13,18 @@ class KpService {
       if (response.statusCode == 200) {
         final List<dynamic> data = jsonDecode(response.body);
         final latest = data.last;
-
-        return double.tryParse(latest[1].toString()) ?? 0.0;
+        
+        // Convert to double and handle any potential integer values
+        final kpValue = latest[1];
+        if (kpValue is int) {
+          return kpValue.toDouble();
+        }
+        return double.tryParse(kpValue.toString()) ?? 0.0;
       } else {
         throw Exception('Failed to load Kp index');
       }
     } catch (e) {
-      print('Error fetching Kp index: \$e');
+      print('Error fetching Kp index: $e');
       return 0.0;
     }
   }

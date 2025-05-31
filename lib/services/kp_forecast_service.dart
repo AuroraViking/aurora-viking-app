@@ -84,12 +84,15 @@ class KpForecastService {
         double kpValue = 2.0; // Default
         if (item is Map<String, dynamic>) {
           if (item.containsKey('predicted_kp')) {
-            kpValue = double.tryParse(item['predicted_kp'].toString()) ?? 2.0;
+            final value = item['predicted_kp'];
+            kpValue = value is int ? value.toDouble() : double.tryParse(value.toString()) ?? 2.0;
           } else if (item.containsKey('kp')) {
-            kpValue = double.tryParse(item['kp'].toString()) ?? 2.0;
+            final value = item['kp'];
+            kpValue = value is int ? value.toDouble() : double.tryParse(value.toString()) ?? 2.0;
           }
         } else if (item is List && item.length > 1) {
-          kpValue = double.tryParse(item[1].toString()) ?? 2.0;
+          final value = item[1];
+          kpValue = value is int ? value.toDouble() : double.tryParse(value.toString()) ?? 2.0;
         }
 
         forecast.add(KpForecastDay(
