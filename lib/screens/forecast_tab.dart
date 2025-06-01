@@ -526,32 +526,6 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
             child: Column(
               children: [
                 const SizedBox(height: 16),
-                // Cloud Cover Forecast Map
-                if (_currentPosition != null && _cloudCoverData != null)
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(
-                        color: Colors.tealAccent.withOpacity(0.3),
-                        width: 1,
-                      ),
-                      boxShadow: [
-                        BoxShadow(
-                          color: Colors.black.withOpacity(0.5),
-                          blurRadius: 10,
-                          offset: const Offset(0, 4),
-                        ),
-                      ],
-                    ),
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(16),
-                      child: CloudForecastMap(
-                        position: _currentPosition!,
-                      ),
-                    ),
-                  ),
-                const SizedBox(height: 20),
                 // 5-Day Kp Forecast Section
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
