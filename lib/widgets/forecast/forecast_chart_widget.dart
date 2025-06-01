@@ -9,6 +9,8 @@ class ForecastChartWidget extends StatefulWidget {
   final double kp;
   final double speed;
   final double density;
+  final double bt;
+  final List<double> btValues;
 
   const ForecastChartWidget({
     super.key,
@@ -17,6 +19,8 @@ class ForecastChartWidget extends StatefulWidget {
     required this.kp,
     required this.speed,
     required this.density,
+    required this.bt,
+    required this.btValues,
   });
 
   @override
@@ -104,6 +108,7 @@ class _ForecastChartWidgetState extends State<ForecastChartWidget> with SingleTi
                     LineChart(
                       LineChartData(
                         lineBarsData: [
+                          // Bz line
                           LineChartBarData(
                             spots: List.generate(
                               widget.bzValues.length,
@@ -147,6 +152,74 @@ class _ForecastChartWidgetState extends State<ForecastChartWidget> with SingleTi
                               ),
                               blurRadius: 12 + (_pulseAnimation.value * 12 * (bzH / 3)),
                               offset: const Offset(0, 2),
+                            ),
+                          ),
+                          // Bt line (positive)
+                          LineChartBarData(
+                            spots: List.generate(
+                              widget.btValues.length,
+                              (i) => FlSpot(i.toDouble(), widget.btValues[i]),
+                            ),
+                            isCurved: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.amber.withOpacity(0.9),
+                                Colors.orange.withOpacity(0.7),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            barWidth: 2.5,
+                            dotData: const FlDotData(show: false),
+                            shadow: Shadow(
+                              color: Colors.amber.withOpacity(0.5),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.amber.withOpacity(0.1),
+                                  Colors.transparent,
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
+                            ),
+                          ),
+                          // Bt line (negative)
+                          LineChartBarData(
+                            spots: List.generate(
+                              widget.btValues.length,
+                              (i) => FlSpot(i.toDouble(), -widget.btValues[i]),
+                            ),
+                            isCurved: true,
+                            gradient: LinearGradient(
+                              colors: [
+                                Colors.amber.withOpacity(0.9),
+                                Colors.orange.withOpacity(0.7),
+                              ],
+                              begin: Alignment.topLeft,
+                              end: Alignment.bottomRight,
+                            ),
+                            barWidth: 2.5,
+                            dotData: const FlDotData(show: false),
+                            shadow: Shadow(
+                              color: Colors.amber.withOpacity(0.5),
+                              blurRadius: 8,
+                              offset: const Offset(0, 2),
+                            ),
+                            belowBarData: BarAreaData(
+                              show: true,
+                              gradient: LinearGradient(
+                                colors: [
+                                  Colors.amber.withOpacity(0.1),
+                                  Colors.transparent,
+                                ],
+                                begin: Alignment.topCenter,
+                                end: Alignment.bottomCenter,
+                              ),
                             ),
                           ),
                         ],
@@ -268,6 +341,48 @@ class _ForecastChartWidgetState extends State<ForecastChartWidget> with SingleTi
                           ] : [],
                         ),
                         backgroundColor: Colors.transparent,
+                        lineTouchData: LineTouchData(
+                          touchTooltipData: LineTouchTooltipData(
+                            tooltipBorder: BorderSide(
+                              color: Colors.tealAccent.withOpacity(0.3),
+                              width: 1,
+                            ),
+                            tooltipRoundedRadius: 8,
+                            tooltipPadding: const EdgeInsets.all(8),
+                            tooltipMargin: 8,
+                            getTooltipItems: (List<LineBarSpot> touchedSpots) {
+                              return touchedSpots.map((spot) {
+                                final index = spot.x.toInt();
+                                if (index >= widget.times.length) return null;
+                                
+                                String value;
+                                Color color;
+                                if (spot.barIndex == 0) {
+                                  value = 'Bz: ${spot.y.toStringAsFixed(2)} nT';
+                                  color = const Color(0xFF4ECDC4);
+                                } else if (spot.barIndex == 2) { // Only show Bt for negative line
+                                  value = 'Bt: ${spot.y.abs().toStringAsFixed(2)} nT';
+                                  color = Colors.amber;
+                                } else {
+                                  return null; // Don't show tooltip for positive Bt line
+                                }
+                                
+                                return LineTooltipItem(
+                                  value,
+                                  TextStyle(
+                                    color: color,
+                                    fontSize: 12,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                );
+                              }).toList();
+                            },
+                          ),
+                          handleBuiltInTouches: true,
+                          touchCallback: (FlTouchEvent event, LineTouchResponse? response) {
+                            // Handle touch events if needed
+                          },
+                        ),
                       ),
                     ),
                   ],

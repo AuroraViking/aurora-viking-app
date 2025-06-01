@@ -25,10 +25,13 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
   late TabController _tabController;
   List<double> bzValues = [];
   List<String> times = [];
+  List<double> btValues = [];
   double kp = 0.0;
   double speed = 0.0;
   double density = 0.0;
+  double bt = 0.0;
   List<KpForecastDay> kpForecast = [];
+  List<KpForecastDay> fiveDayForecast = [];
   bool isLoading = true;
   
   // Cloud cover data
@@ -114,14 +117,18 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
       final bzRes = await SolarWindService.fetchBzHistory();
       final kpIndex = await KpService.fetchCurrentKp();
       final forecast = await KpForecastService.fetchKpForecast();
+      final fiveDay = await KpForecastService.fetchFiveDayForecast();
 
       setState(() {
         bzValues = bzRes.bzValues;
         times = bzRes.times;
+        btValues = bzRes.btValues;
         kp = kpIndex;
         speed = swData.speed;
         density = swData.density;
+        bt = swData.bt;
         kpForecast = forecast;
+        fiveDayForecast = fiveDay;
         isLoading = false;
       });
     } catch (e) {
@@ -347,9 +354,13 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildDataRow('BzH', bzH.toStringAsFixed(2), Colors.white, isHighlighted: true),
+                                _buildDataRow('-BzH', bzH.toStringAsFixed(2), Colors.white, isHighlighted: true, infoType: 'BzH'),
                                 const SizedBox(height: 8),
-                                _buildDataRow('Kp Index', kp.toStringAsFixed(1), Colors.white70),
+                                _buildDataRow('Kp Index', kp.toStringAsFixed(1), Colors.white70, infoType: 'Kp'),
+                                const SizedBox(height: 8),
+                                _buildDataRow('Bt', '${bt.toStringAsFixed(1)} nT', Colors.white70, infoType: 'Bt'),
+                                const SizedBox(height: 8),
+                                _buildDataRow('Bz', '${bzValues.isNotEmpty ? bzValues.last.toStringAsFixed(1) : '0.0'} nT', Colors.white70, infoType: 'Bz'),
                               ],
                             ),
                           ),
@@ -357,13 +368,40 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
                               children: [
-                                _buildDataRow('Speed', '${speed.toStringAsFixed(0)} km/s', Colors.white70),
+                                _buildDataRow('Speed', '${speed.toStringAsFixed(0)} km/s', Colors.white70, infoType: 'Speed'),
                                 const SizedBox(height: 8),
-                                _buildDataRow('Density', '${density.toStringAsFixed(1)} p/cm³', Colors.white70),
+                                _buildDataRow('Density', '${density.toStringAsFixed(1)} p/cm³', Colors.white70, infoType: 'Density'),
                               ],
                             ),
                           ),
                         ],
+                      ),
+                      const SizedBox(height: 12),
+                      Container(
+                        padding: const EdgeInsets.all(8),
+                        decoration: BoxDecoration(
+                          color: Colors.tealAccent.withOpacity(0.1),
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(
+                            color: Colors.tealAccent.withOpacity(0.3),
+                          ),
+                        ),
+                        child: Row(
+                          children: [
+                            Icon(Icons.satellite_alt, color: Colors.tealAccent, size: 16),
+                            const SizedBox(width: 8),
+                            Expanded(
+                              child: Text(
+                                'Data from DSCOVR satellite at L1 point (1.5 million km from Earth)',
+                                style: TextStyle(
+                                  color: Colors.tealAccent,
+                                  fontSize: 12,
+                                  fontStyle: FontStyle.italic,
+                                ),
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ],
                   ),
@@ -378,6 +416,8 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                     kp: kp,
                     speed: speed,
                     density: density,
+                    bt: bt,
+                    btValues: btValues,
                   ),
                 ),
                 const SizedBox(height: 20),
@@ -526,7 +566,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
             child: Column(
               children: [
                 const SizedBox(height: 16),
-                // 5-Day Kp Forecast Section
+                // 24-Hour Kp Forecast Section
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
                   child: Column(
@@ -537,7 +577,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                           Icon(Icons.schedule, color: Colors.tealAccent, size: 20),
                           const SizedBox(width: 8),
                           Text(
-                            '5-Day Kp Forecast',
+                            '24-Hour Kp Forecast',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
@@ -552,6 +592,34 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                     ],
                   ),
                 ),
+                const SizedBox(height: 24),
+                // 5-Day Kp Forecast Section
+                Container(
+                  margin: const EdgeInsets.symmetric(horizontal: 16),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.calendar_today, color: Colors.tealAccent, size: 20),
+                          const SizedBox(width: 8),
+                          Text(
+                            '5-Day Kp Forecast',
+                            style: TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.bold,
+                              color: Colors.tealAccent,
+                              shadows: [Shadow(color: Colors.tealAccent, blurRadius: 8)],
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 12),
+                      _buildFiveDayForecastList(),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 20),
               ],
             ),
           ),
@@ -594,7 +662,33 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
     );
   }
 
+  Widget _buildFiveDayForecastList() {
+    if (fiveDayForecast.isEmpty) {
+      return Container(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: Colors.white.withOpacity(0.05),
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.white.withOpacity(0.1)),
+        ),
+        child: Center(
+          child: Text(
+            'Forecast data unavailable',
+            style: TextStyle(color: Colors.white54),
+          ),
+        ),
+      );
+    }
+
+    return Column(
+      children: fiveDayForecast.map((forecast) => _buildKpForecastCard(forecast)).toList(),
+    );
+  }
+
   Widget _buildKpForecastCard(KpForecastDay forecast) {
+    final isToday = forecast.date.day == DateTime.now().day;
+    final isCurrentHour = isToday && forecast.hour == DateTime.now().hour;
+
     return Container(
       margin: const EdgeInsets.only(bottom: 8),
       padding: const EdgeInsets.all(12),
@@ -615,9 +709,9 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
       ),
       child: Row(
         children: [
-          // Date
+          // Date and Time
           SizedBox(
-            width: 80,
+            width: 100,
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
@@ -629,14 +723,15 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                     fontWeight: FontWeight.w600,
                   ),
                 ),
-                Text(
-                  forecast.date.day == DateTime.now().day ? 'Today' : '',
-                  style: TextStyle(
-                    color: Colors.tealAccent,
-                    fontSize: 11,
-                    fontWeight: FontWeight.bold,
+                if (isToday)
+                  Text(
+                    isCurrentHour ? 'Now' : 'Today',
+                    style: TextStyle(
+                      color: Colors.tealAccent,
+                      fontSize: 11,
+                      fontWeight: FontWeight.bold,
+                    ),
                   ),
-                ),
               ],
             ),
           ),
@@ -773,43 +868,40 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
     );
   }
 
-  Widget _buildDataRow(String label, String value, Color color, {bool isHighlighted = false}) {
+  Widget _buildDataRow(String label, String value, Color color, {String? infoType, bool isHighlighted = false}) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.center,
       children: [
-        SizedBox(
-          width: 75,
+        Expanded(
+          flex: 2,
           child: Row(
-            mainAxisSize: MainAxisSize.min,
             children: [
-              Flexible(
-                child: Text(
-                  '$label:',
-                  style: TextStyle(
-                    color: color.withOpacity(0.8),
-                    fontSize: isHighlighted ? 12 : 11,
-                    fontWeight: FontWeight.w500,
-                  ),
-                  overflow: TextOverflow.ellipsis,
+              Text(
+                label,
+                style: TextStyle(
+                  color: color.withOpacity(0.8),
+                  fontSize: isHighlighted ? 12 : 11,
+                  fontWeight: FontWeight.w500,
                 ),
+                overflow: TextOverflow.ellipsis,
               ),
-              if (label == 'BzH' || label == 'Kp Index')
+              if (infoType != null)
                 Padding(
-                  padding: const EdgeInsets.only(left: 2),
+                  padding: const EdgeInsets.only(left: 4),
                   child: GestureDetector(
-                    onTap: () => _showInfoDialog(context, label),
+                    onTap: () => _showInfoDialog(context, infoType),
                     child: Icon(
                       Icons.help_outline,
-                      color: color,
-                      size: 14,
+                      size: 16,
+                      color: Colors.tealAccent.withOpacity(0.7),
                     ),
                   ),
                 ),
             ],
           ),
         ),
-        const SizedBox(width: 4),
         Expanded(
+          flex: 3,
           child: Container(
             padding: EdgeInsets.symmetric(
               horizontal: isHighlighted ? 8 : 6,
@@ -966,19 +1058,19 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
 
     switch (type) {
       case 'BzH':
-        title = 'BzH (Bz per Hour)';
-        content = '''BzH is a unique metric developed by Kolbeinn Helgi Kristjansson, founder of Aurora Viking, that calculates the average negative Bz values per hour.
+        title = '-BzH (Negative Bz per Hour)';
+        content = '''-BzH is a unique metric developed by Kolbeinn Helgi Kristjánsson, founder of Aurora Viking, that calculates the average negative Bz values per hour.
 
 The equation:
-BzH = Σ(-Bz/60) for Bz < 0 over the last 60 minutes
+-BzH = Σ(-Bz/60) for Bz < 0 over the last 60 minutes
 
-This helps predict aurora activity by considering both the magnitude and duration of negative Bz values, which indicate favorable conditions for aurora formation.
+This helps predict aurora activity by considering both the magnitude and duration of negative Bz values, which indicate favorable conditions for aurora formation. The metric represents the square area in nT when Bz goes below 0, giving a good image of how active the aurora will be in the next hour.
 
-Higher BzH values suggest stronger and more sustained aurora activity.''';
+Higher -BzH values suggest stronger and more sustained aurora activity.''';
         icon = Icons.calculate;
         break;
 
-      case 'Kp Index':
+      case 'Kp':
         title = 'Kp Index';
         content = '''The Kp index indicates the latitude where aurora might form, but remember: aurora only forms when Bz is negative, regardless of Kp value.
 
@@ -996,7 +1088,28 @@ Important Note:
         icon = Icons.speed;
         break;
 
-      case 'Bz Chart':
+      case 'Bt':
+        title = 'Total Magnetic Field (Bt)';
+        content = '''Bt represents the total strength of the interplanetary magnetic field (IMF).
+
+Calculation:
+Bt = √(Bx² + By² + Bz²)
+
+Where:
+• Bx, By, Bz are the magnetic field components
+• All values are in nanotesla (nT)
+
+Significance:
+• Higher Bt values indicate stronger overall magnetic field
+• Important for understanding the total magnetic field energy available
+• Used in conjunction with Bz to predict aurora activity
+• Typical values range from 1-20 nT
+
+Note: Bt alone doesn't predict aurora - it must be combined with negative Bz for aurora formation.''';
+        icon = Icons.science;
+        break;
+
+      case 'Bz':
         title = 'Bz Component';
         content = '''The Bz component measures the north-south direction of the interplanetary magnetic field (IMF).
 
@@ -1004,14 +1117,50 @@ Important Note:
   - Allows solar wind to connect with Earth's magnetic field
   - Triggers geomagnetic storms
   - Higher chance of aurora activity
+  - Typical values: -1 to -20 nT
 
 • Positive Bz: Unfavorable for aurora
   - Solar wind is deflected
   - Less geomagnetic activity
   - Lower chance of aurora
+  - Typical values: 1 to 20 nT
 
-The chart shows Bz values over time, helping predict aurora activity.''';
-        icon = Icons.show_chart;
+The Bz value is crucial for aurora formation - negative values are required for aurora activity.''';
+        icon = Icons.arrow_upward;
+        break;
+
+      case 'Speed':
+        title = 'Solar Wind Speed';
+        content = '''The solar wind speed indicates how fast the charged particles from the Sun are traveling.
+
+• Typical range: 300-800 km/s
+• Higher speeds (>500 km/s) often indicate:
+  - Coronal hole high-speed streams
+  - Coronal mass ejections (CMEs)
+  - More energetic particles reaching Earth
+
+• Impact on aurora:
+  - Higher speeds can enhance aurora activity
+  - Combined with negative Bz for best results
+  - Affects how quickly solar wind reaches Earth''';
+        icon = Icons.speed;
+        break;
+
+      case 'Density':
+        title = 'Solar Wind Density';
+        content = '''The solar wind density measures the number of particles per cubic centimeter (p/cm³).
+
+• Typical range: 1-10 p/cm³
+• Higher density (>5 p/cm³) often indicates:
+  - More particles available for aurora formation
+  - Stronger geomagnetic activity
+  - Enhanced aurora displays
+
+• Impact on aurora:
+  - Higher density can intensify aurora
+  - Works in combination with Bz and speed
+  - Sudden increases may indicate CME arrival''';
+        icon = Icons.density_medium;
         break;
 
       default:
