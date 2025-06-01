@@ -12,6 +12,7 @@ import '../services/light_pollution_service.dart';
 import '../services/sunrise_sunset_service.dart';
 import '../widgets/forecast/bortle_map.dart';
 import '../services/moon_service.dart';
+import '../widgets/forecast/cloud_forecast_map.dart';
 
 class ForecastTab extends StatefulWidget {
   const ForecastTab({super.key});
@@ -48,7 +49,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 2, vsync: this);
+    _tabController = TabController(length: 3, vsync: this);
     _loadData();
     _loadCloudCoverData();
   }
@@ -217,13 +218,15 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
             unselectedLabelColor: Colors.white70,
             tabs: const [
               Tab(text: 'Nowcast'),
-              Tab(text: 'Forecast'),
+              Tab(text: 'Aurora Forecast'),
+              Tab(text: 'Cloud Cover'),
             ],
           ),
         ),
       ),
       body: TabBarView(
         controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(),
         children: [
           // Nowcast Tab
           SingleChildScrollView(
@@ -385,6 +388,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                     cloudCover: (_cloudCoverData!['cloudCover'] ?? 0).toDouble(),
                     weatherDescription: _weatherData?['description'] ?? 'N/A',
                     weatherIcon: _weatherData?['icon'] ?? 'N/A',
+                    isNowcast: true,
                   ),
                 const SizedBox(height: 20),
                 // Sun/Daylight Info
@@ -517,11 +521,37 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
               ],
             ),
           ),
-          // Forecast Tab
+          // Aurora Forecast Tab
           SingleChildScrollView(
             child: Column(
               children: [
                 const SizedBox(height: 16),
+                // Cloud Cover Forecast Map
+                if (_currentPosition != null && _cloudCoverData != null)
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.tealAccent.withOpacity(0.3),
+                        width: 1,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(16),
+                      child: CloudForecastMap(
+                        position: _currentPosition!,
+                      ),
+                    ),
+                  ),
+                const SizedBox(height: 20),
                 // 5-Day Kp Forecast Section
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -551,6 +581,17 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
               ],
             ),
           ),
+          // Cloud Cover Tab
+          _currentPosition != null
+              ? CloudForecastMap(
+                  position: _currentPosition!,
+                )
+              : const Center(
+                  child: Text(
+                    'Waiting for location...',
+                    style: TextStyle(color: Colors.white70),
+                  ),
+                ),
         ],
       ),
     );
