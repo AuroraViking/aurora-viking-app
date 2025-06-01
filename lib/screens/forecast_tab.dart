@@ -431,6 +431,14 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                     isNowcast: true,
                   ),
                 const SizedBox(height: 20),
+              ],
+            ),
+          ),
+          // Aurora Forecast Tab
+          SingleChildScrollView(
+            child: Column(
+              children: [
+                const SizedBox(height: 16),
                 // Sun/Daylight Info
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
@@ -558,14 +566,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                     ],
                   ),
                 ),
-              ],
-            ),
-          ),
-          // Aurora Forecast Tab
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                const SizedBox(height: 16),
+                const SizedBox(height: 20),
                 // 24-Hour Kp Forecast Section
                 Container(
                   margin: const EdgeInsets.symmetric(horizontal: 16),
