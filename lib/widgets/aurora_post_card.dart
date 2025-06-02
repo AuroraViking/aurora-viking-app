@@ -37,11 +37,14 @@ class _AuroraPostCardState extends State<AuroraPostCard> {
   bool _isLoadingComments = false;
   final TextEditingController _commentController = TextEditingController();
 
+  String? _profilePictureUrl;
+
   @override
   void initState() {
     super.initState();
     _loadComments();
     _checkIfLiked();
+    _fetchProfilePicture();
   }
 
   @override
@@ -70,6 +73,20 @@ class _AuroraPostCardState extends State<AuroraPostCard> {
       setState(() {
         _isLiked = widget.sighting.confirmedByUsers.contains(userId);
       });
+    }
+  }
+
+  Future<void> _fetchProfilePicture() async {
+    try {
+      final userDoc = await _firebaseService.firestore.collection('users').doc(widget.sighting.userId).get();
+      final url = userDoc.data()?['profilePictureUrl'] as String?;
+      if (mounted) {
+        setState(() {
+          _profilePictureUrl = url;
+        });
+      }
+    } catch (e) {
+      print('Error fetching profile picture: $e');
     }
   }
 
@@ -345,13 +362,16 @@ Shared via Aurora Viking App
             onTap: () => widget.onViewProfile.call(widget.sighting.userId),
             child: CircleAvatar(
               backgroundColor: Colors.tealAccent,
-              child: Text(
-                widget.sighting.userName[0].toUpperCase(),
-                style: const TextStyle(
-                  color: Colors.black,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
+              backgroundImage: _profilePictureUrl != null ? NetworkImage(_profilePictureUrl!) : null,
+              child: _profilePictureUrl == null
+                  ? Text(
+                      widget.sighting.userName[0].toUpperCase(),
+                      style: const TextStyle(
+                        color: Colors.black,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    )
+                  : null,
             ),
           ),
           const SizedBox(width: 8),
