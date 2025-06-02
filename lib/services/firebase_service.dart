@@ -10,6 +10,8 @@ import '../services/user_photos_service.dart';
 import '../services/bokun_service.dart';
 import '../models/aurora_sighting.dart';
 import '../models/aurora_comment.dart';
+import '../models/user_aurora_photo.dart';
+import 'package:geolocator/geolocator.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -94,9 +96,9 @@ class FirebaseService {
   // Create user profile in Firestore
   Future<void> _createUserProfile(User user) async {
     try {
-      await firestore.collection('users').doc(user.uid).set({
+      final userData = {
         'email': user.email,
-        'displayName': user.displayName,
+        'displayName': user.displayName ?? user.email?.split('@')[0] ?? 'Anonymous',
         'createdAt': FieldValue.serverTimestamp(),
         'auroraSpottingCount': 0,
         'verificationCount': 0,
@@ -105,8 +107,13 @@ class FirebaseService {
         'tourParticipant': false,
         'tourBookings': [],
         'verifiedTourEmail': null,
-      }, SetOptions(merge: true));
+        'profilePictureUrl': null,
+        'bio': null,
+        'location': null,
+        'lastLocationName': null,
+      };
 
+      await firestore.collection('users').doc(user.uid).set(userData, SetOptions(merge: true));
       print('✅ User profile created/updated');
     } catch (e) {
       print('❌ Failed to create user profile: $e');
@@ -327,10 +334,14 @@ class FirebaseService {
         photoUrl = await _uploadAuroraPhoto(photoFile, photoBytes);
       }
 
+      // Get user's display name from their profile
+      final userDoc = await firestore.collection('users').doc(currentUser!.uid).get();
+      final userDisplayName = userDoc.data()?['displayName'] ?? currentUser!.displayName ?? currentUser!.email?.split('@')[0] ?? 'Anonymous';
+
       // Create sighting document
       final sightingRef = await firestore.collection('aurora_sightings').add({
         'userId': currentUser!.uid,
-        'userDisplayName': userDisplayName,
+        'userName': userDisplayName,
         'location': GeoPoint(latitude, longitude),
         'locationName': address,
         'intensity': intensity,
@@ -365,6 +376,8 @@ class FirebaseService {
           photoUrl: photoUrl,
           locationName: address,
           intensity: intensity,
+          latitude: latitude,
+          longitude: longitude,
           metadata: {
             'description': description,
             'weather': {
@@ -405,7 +418,7 @@ class FirebaseService {
     required double latitude,
     required double longitude,
     double radiusKm = 100,
-    int hours = 6,
+    int hours = 24,
   }) async {
     final since = DateTime.now().subtract(Duration(hours: hours));
 
@@ -420,10 +433,23 @@ class FirebaseService {
     // Filter by distance (simplified calculation)
     return snapshot.docs.where((doc) {
       final data = doc.data() as Map<String, dynamic>;
-      final location = data['location'] as Map<String, dynamic>;
+      final location = data['location'];
+      
+      // Handle both GeoPoint and Map locations
+      double sightingLat, sightingLng;
+      if (location is GeoPoint) {
+        sightingLat = location.latitude;
+        sightingLng = location.longitude;
+      } else if (location is Map<String, dynamic>) {
+        sightingLat = location['latitude']?.toDouble() ?? 0.0;
+        sightingLng = location['longitude']?.toDouble() ?? 0.0;
+      } else {
+        return false; // Skip invalid locations
+      }
+
       final distance = _calculateDistance(
         latitude, longitude,
-        location['latitude'], location['longitude'],
+        sightingLat, sightingLng,
       );
       return distance <= radiusKm;
     }).toList();
@@ -736,12 +762,24 @@ class FirebaseService {
         parentCommentId: parentCommentId,
       );
 
-      await firestore
-          .collection('aurora_sightings')
-          .doc(sightingId)
-          .collection('comments')
-          .doc(comment.id)
-          .set(comment.toFirestore());
+      // Add the comment and update the sighting's comment count in a transaction
+      await firestore.runTransaction((transaction) async {
+        // Add the comment
+        transaction.set(
+          firestore
+              .collection('aurora_sightings')
+              .doc(sightingId)
+              .collection('comments')
+              .doc(comment.id),
+          comment.toFirestore(),
+        );
+
+        // Update the sighting's comment count
+        final sightingRef = firestore.collection('aurora_sightings').doc(sightingId);
+        transaction.update(sightingRef, {
+          'commentCount': FieldValue.increment(1),
+        });
+      });
     } catch (e) {
       print('Error adding comment: $e');
       rethrow;
@@ -753,11 +791,17 @@ class FirebaseService {
       final user = currentUser;
       if (user == null) throw Exception('User not authenticated');
 
+      print('Getting nearby sightings for user: ${user.uid}');
+
       // Get user's location from their last sighting or profile
       final userDoc = await firestore.collection('users').doc(user.uid).get();
-      final userLocation = userDoc.data()?['location'] as GeoPoint?;
+      final userLocation = userDoc.data()?['location'];
+      print('User location from profile: $userLocation');
+
+      double latitude, longitude;
 
       if (userLocation == null) {
+        print('No location in user profile, checking last sighting');
         // If no location in profile, try to get from last sighting
         final lastSighting = await firestore
             .collection('aurora_sightings')
@@ -767,50 +811,90 @@ class FirebaseService {
             .get();
 
         if (lastSighting.docs.isEmpty) {
+          print('No last sighting found, getting current device location');
+          // If no last sighting, get current device location
+          try {
+            final position = await Geolocator.getCurrentPosition(
+              desiredAccuracy: LocationAccuracy.high,
+              timeLimit: const Duration(seconds: 10),
+            );
+            latitude = position.latitude;
+            longitude = position.longitude;
+            print('Got current device location: $latitude, $longitude');
+            
+            // Update user's profile with current location
+            await firestore.collection('users').doc(user.uid).update({
+              'location': GeoPoint(latitude, longitude),
+              'lastLocationUpdate': FieldValue.serverTimestamp(),
+            });
+            print('Updated user profile with current location');
+          } catch (e) {
+            print('Error getting current location: $e');
+            return [];
+          }
+        } else {
+          print('Found last sighting, using its location');
+          final sightingData = lastSighting.docs.first.data();
+          final location = sightingData['location'];
+          print('Last sighting location data: $location');
+
+          if (location is GeoPoint) {
+            latitude = location.latitude;
+            longitude = location.longitude;
+            print('Location is GeoPoint: $latitude, $longitude');
+          } else if (location is Map<String, dynamic>) {
+            latitude = location['latitude']?.toDouble() ?? 0.0;
+            longitude = location['longitude']?.toDouble() ?? 0.0;
+            print('Location is Map: $latitude, $longitude');
+          } else {
+            print('Invalid location type: ${location.runtimeType}');
+            return [];
+          }
+        }
+      } else {
+        if (userLocation is GeoPoint) {
+          latitude = userLocation.latitude;
+          longitude = userLocation.longitude;
+          print('Using GeoPoint location from profile: $latitude, $longitude');
+        } else if (userLocation is Map<String, dynamic>) {
+          latitude = userLocation['latitude']?.toDouble() ?? 0.0;
+          longitude = userLocation['longitude']?.toDouble() ?? 0.0;
+          print('Using Map location from profile: $latitude, $longitude');
+        } else {
+          print('Invalid user location type: ${userLocation.runtimeType}');
           return [];
         }
-
-        final sightingData = lastSighting.docs.first.data();
-        final location = sightingData['location'] as GeoPoint;
-        final latitude = location.latitude;
-        final longitude = location.longitude;
-
-        // Get all recent sightings and filter by distance
-        final snapshot = await firestore
-            .collection('aurora_sightings')
-            .orderBy('timestamp', descending: true)
-            .limit(100)
-            .get();
-
-        return snapshot.docs
-            .map((doc) => AuroraSighting.fromFirestore(doc))
-            .where((sighting) {
-              final distance = _calculateDistance(
-                latitude, longitude,
-                sighting.location.latitude, sighting.location.longitude,
-              );
-              return distance <= 100; // 100km radius
-            })
-            .toList();
       }
 
-      // If we have user location in profile, use that
+      // Get all recent sightings and filter by distance
+      final now = DateTime.now();
+      final twentyFourHoursAgo = now.subtract(const Duration(hours: 24));
+      print('Fetching sightings from last 24 hours');
+      
       final snapshot = await firestore
           .collection('aurora_sightings')
+          .where('timestamp', isGreaterThan: Timestamp.fromDate(twentyFourHoursAgo))
           .orderBy('timestamp', descending: true)
           .limit(100)
           .get();
 
-      return snapshot.docs
+      print('Found ${snapshot.docs.length} recent sightings');
+
+      final sightings = snapshot.docs
           .map((doc) => AuroraSighting.fromFirestore(doc))
           .where((sighting) {
             final distance = _calculateDistance(
-              userLocation.latitude, userLocation.longitude,
+              latitude, longitude,
               sighting.location.latitude, sighting.location.longitude,
             );
-            return distance <= 100; // 100km radius
+            final isNearby = distance <= 100; // 100km radius
+            print('Sighting ${sighting.id} distance: ${distance.toStringAsFixed(2)}km, isNearby: $isNearby');
+            return isNearby;
           })
           .toList();
+
+      print('Found ${sightings.length} nearby sightings');
+      return sightings;
     } catch (e) {
       print('Error getting nearby sightings: $e');
       return [];
@@ -818,31 +902,44 @@ class FirebaseService {
   }
 
   Future<Map<String, dynamic>> confirmAuroraSighting(String sightingId) async {
+    print('confirmAuroraSighting called for sighting: $sightingId');
     try {
       final user = currentUser;
-      if (user == null) throw Exception('User not authenticated');
+      if (user == null) {
+        print('User not authenticated');
+        throw Exception('User not authenticated');
+      }
+      print('Current user: ${user.uid}');
 
       final sightingRef = firestore.collection('aurora_sightings').doc(sightingId);
+      print('Getting sighting document...');
       
       return await firestore.runTransaction((transaction) async {
         final sightingDoc = await transaction.get(sightingRef);
         if (!sightingDoc.exists) {
+          print('Sighting not found');
           throw Exception('Sighting not found');
         }
 
         final data = sightingDoc.data() as Map<String, dynamic>;
         final verifications = List<String>.from(data['verifications'] ?? []);
         final isLiked = verifications.contains(user.uid);
+        print('Current verifications: $verifications');
+        print('Is already liked: $isLiked');
 
         if (isLiked) {
           verifications.remove(user.uid);
+          print('Removing user from verifications');
         } else {
           verifications.add(user.uid);
+          print('Adding user to verifications');
         }
 
         final confirmations = verifications.length;
+        print('New confirmation count: $confirmations');
 
         // Update the document with all necessary fields
+        print('Updating sighting document...');
         transaction.update(sightingRef, {
           'verifications': verifications,
           'confirmations': confirmations,
@@ -852,19 +949,22 @@ class FirebaseService {
 
         // Also update the user's verification count
         if (isAuthenticated) {
-          transaction.update(
-            firestore.collection('users').doc(user.uid),
-            {
-              'verificationCount': FieldValue.increment(isLiked ? -1 : 1),
-              'lastActive': FieldValue.serverTimestamp(),
-            },
-          );
+          print('Updating user verification count...');
+          final userRef = firestore.collection('users').doc(user.uid);
+          transaction.update(userRef, {
+            'verificationCount': FieldValue.increment(isLiked ? -1 : 1),
+            'lastActive': FieldValue.serverTimestamp(),
+            'lastUpdated': FieldValue.serverTimestamp(),
+          });
         }
 
-        return {
+        final result = {
           'isLiked': !isLiked,
           'confirmations': confirmations,
+          'verifications': verifications,
         };
+        print('Transaction completed with result: $result');
+        return result;
       });
     } catch (e) {
       print('Error confirming sighting: $e');

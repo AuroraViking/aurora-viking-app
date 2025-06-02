@@ -15,6 +15,7 @@ class AuroraSighting {
   final List<String> confirmedByUsers;
   final bool isVerified;
   final Map<String, dynamic> weather;
+  final int commentCount;
 
   AuroraSighting({
     required this.id,
@@ -30,23 +31,29 @@ class AuroraSighting {
     required this.confirmedByUsers,
     required this.isVerified,
     required this.weather,
+    this.commentCount = 0,
   });
 
   /// Create from Firestore document
   factory AuroraSighting.fromFirestore(DocumentSnapshot doc) {
     final data = doc.data() as Map<String, dynamic>;
+    print('Processing sighting document: ${doc.id}');
+    print('Raw location data: ${data['location']}');
 
     // Handle location data - could be GeoPoint or Map
     GeoPoint location;
     if (data['location'] is GeoPoint) {
       location = data['location'] as GeoPoint;
+      print('Location is GeoPoint: ${location.latitude}, ${location.longitude}');
     } else if (data['location'] is Map<String, dynamic>) {
       final locationMap = data['location'] as Map<String, dynamic>;
       location = GeoPoint(
         locationMap['latitude']?.toDouble() ?? 0.0,
         locationMap['longitude']?.toDouble() ?? 0.0,
       );
+      print('Location is Map: ${location.latitude}, ${location.longitude}');
     } else {
+      print('Invalid location data type: ${data['location']?.runtimeType}');
       location = const GeoPoint(0.0, 0.0);
     }
 
@@ -66,11 +73,12 @@ class AuroraSighting {
       photoUrls = List<String>.from(data['photoUrls']);
     }
 
-    // Handle verifications
+    // Handle verifications and confirmations
     final verifications = List<String>.from(data['verifications'] ?? []);
-    final confirmations = verifications.length;
+    final confirmations = data['confirmations'] as int? ?? verifications.length;
+    final isVerified = data['isVerified'] as bool? ?? confirmations >= 3;
 
-    return AuroraSighting(
+    final sighting = AuroraSighting(
       id: doc.id,
       userId: data['userId'] ?? '',
       userName: data['userName'] ?? data['userDisplayName'] ?? 'Anonymous',
@@ -82,9 +90,13 @@ class AuroraSighting {
       photoUrls: photoUrls,
       confirmations: confirmations,
       confirmedByUsers: verifications,
-      isVerified: data['isVerified'] ?? false,
+      isVerified: isVerified,
       weather: Map<String, dynamic>.from(data['weather'] ?? {}),
+      commentCount: data['commentCount'] as int? ?? 0,
     );
+
+    print('Created sighting: $sighting');
+    return sighting;
   }
 
   /// Convert to Firestore document
@@ -102,6 +114,7 @@ class AuroraSighting {
       'confirmedByUsers': confirmedByUsers,
       'isVerified': isVerified,
       'weather': weather,
+      'commentCount': commentCount,
     };
   }
 
@@ -159,6 +172,7 @@ class AuroraSighting {
       confirmedByUsers: confirmedByUsers ?? this.confirmedByUsers,
       isVerified: isVerified ?? this.isVerified,
       weather: weather,
+      commentCount: commentCount,
     );
   }
 

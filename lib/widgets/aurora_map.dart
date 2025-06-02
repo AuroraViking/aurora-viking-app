@@ -8,13 +8,15 @@ import '../services/cloud_tile_provider.dart';
 class AuroraMap extends StatefulWidget {
   final Position currentLocation;
   final List<AuroraSighting> sightings;
-  final Function(AuroraSighting) onSightingTapped;
+  final Function(GoogleMapController) onMapCreated;
+  final Function(AuroraSighting)? onSightingTapped;
 
   const AuroraMap({
     super.key,
     required this.currentLocation,
     required this.sightings,
-    required this.onSightingTapped,
+    required this.onMapCreated,
+    this.onSightingTapped,
   });
 
   @override
@@ -80,7 +82,7 @@ class _AuroraMapState extends State<AuroraMap> {
             title: '${sighting.intensityDescription} Aurora',
             snippet: '${sighting.userName} • ${sighting.timeAgo}',
           ),
-          onTap: () => widget.onSightingTapped(sighting),
+          onTap: () => widget.onSightingTapped?.call(sighting),
         ),
       );
 
@@ -256,9 +258,9 @@ class _AuroraMapState extends State<AuroraMap> {
           markers: _markers,
           circles: _circles,
           tileOverlays: _tileOverlays,
-          myLocationEnabled: false, // We have custom current location marker
-          myLocationButtonEnabled: false,
-          zoomControlsEnabled: false,
+          myLocationEnabled: true,
+          myLocationButtonEnabled: true,
+          zoomControlsEnabled: true,
           mapToolbarEnabled: false,
           compassEnabled: true,
           mapType: MapType.normal,

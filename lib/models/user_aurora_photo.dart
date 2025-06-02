@@ -16,6 +16,10 @@ class UserAuroraPhoto {
   final int printCount;
   final DateTime? lastPrintedAt;
   final Map<String, dynamic> metadata;
+  final double latitude;
+  final double longitude;
+  final int confirmations;
+  final int commentCount;
 
   UserAuroraPhoto({
     required this.id,
@@ -32,6 +36,10 @@ class UserAuroraPhoto {
     required this.printCount,
     this.lastPrintedAt,
     required this.metadata,
+    required this.latitude,
+    required this.longitude,
+    required this.confirmations,
+    required this.commentCount,
   });
 
   /// Create from Firestore document
@@ -52,6 +60,10 @@ class UserAuroraPhoto {
       printCount: data['printCount'] ?? 0,
       lastPrintedAt: (data['lastPrintedAt'] as Timestamp?)?.toDate(),
       metadata: Map<String, dynamic>.from(data['metadata'] ?? {}),
+      latitude: (data['latitude'] ?? 0.0).toDouble(),
+      longitude: (data['longitude'] ?? 0.0).toDouble(),
+      confirmations: data['confirmations'] ?? 0,
+      commentCount: data['commentCount'] ?? 0,
     );
   }
 
@@ -71,6 +83,10 @@ class UserAuroraPhoto {
       'printCount': printCount,
       'lastPrintedAt': lastPrintedAt != null ? Timestamp.fromDate(lastPrintedAt!) : null,
       'metadata': metadata,
+      'latitude': latitude,
+      'longitude': longitude,
+      'confirmations': confirmations,
+      'commentCount': commentCount,
     };
   }
 
@@ -146,6 +162,10 @@ class UserAuroraPhoto {
     int? printCount,
     DateTime? lastPrintedAt,
     Map<String, dynamic>? metadata,
+    double? latitude,
+    double? longitude,
+    int? confirmations,
+    int? commentCount,
   }) {
     return UserAuroraPhoto(
       id: id ?? this.id,
@@ -162,6 +182,10 @@ class UserAuroraPhoto {
       printCount: printCount ?? this.printCount,
       lastPrintedAt: lastPrintedAt ?? this.lastPrintedAt,
       metadata: metadata ?? this.metadata,
+      latitude: latitude ?? this.latitude,
+      longitude: longitude ?? this.longitude,
+      confirmations: confirmations ?? this.confirmations,
+      commentCount: commentCount ?? this.commentCount,
     );
   }
 

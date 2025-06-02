@@ -7,22 +7,22 @@ import '../services/firebase_service.dart';
 
 class AuroraPostCard extends StatefulWidget {
   AuroraSighting sighting;
+  final Function(String) onLike;
+  final Function(String) onViewProfile;
+  final Function(GeoPoint) onViewLocation;
   final VoidCallback? onTap;
   final Function(String)? onComment;
-  final Function(String)? onLike;
   final Function(String)? onShare;
-  final Function(String)? onViewProfile;
-  final Function(GeoPoint)? onViewLocation;
 
   AuroraPostCard({
     super.key,
     required this.sighting,
+    required this.onLike,
+    required this.onViewProfile,
+    required this.onViewLocation,
     this.onTap,
     this.onComment,
-    this.onLike,
     this.onShare,
-    this.onViewProfile,
-    this.onViewLocation,
   });
 
   @override
@@ -74,25 +74,32 @@ class _AuroraPostCardState extends State<AuroraPostCard> {
   }
 
   Future<void> _handleLike() async {
+    print('Like button pressed for sighting: ${widget.sighting.id}');
     try {
+      print('Calling confirmAuroraSighting...');
       final result = await _firebaseService.confirmAuroraSighting(widget.sighting.id);
+      print('confirmAuroraSighting result: $result');
       
       setState(() {
         _isLiked = result['isLiked'];
         widget.sighting = widget.sighting.copyWith(
           confirmations: result['confirmations'],
-          confirmedByUsers: result['isLiked'] 
-            ? [...widget.sighting.confirmedByUsers, _firebaseService.currentUser!.uid]
-            : widget.sighting.confirmedByUsers.where((id) => id != _firebaseService.currentUser!.uid).toList(),
+          confirmedByUsers: result['verifications'],
           isVerified: result['confirmations'] >= 3,
         );
       });
-
-      if (widget.onLike != null) {
-        widget.onLike!(widget.sighting.id);
-      }
+      print('State updated successfully');
     } catch (e) {
       print('Error handling like: $e');
+      // Show error to user
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('Failed to like: ${e.toString()}'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
       // Revert the like state if there was an error
       setState(() {
         _isLiked = !_isLiked;
@@ -208,24 +215,27 @@ Shared via Aurora Viking App
               Expanded(
                 child: TextButton.icon(
                   onPressed: () {
-                    setState(() => _showComments = !_showComments);
-                    if (_showComments) _loadComments();
+                    setState(() {
+                      _showComments = !_showComments;
+                    });
                   },
-                  icon: const Icon(Icons.comment_outlined, color: Colors.white70),
+                  icon: Icon(
+                    Icons.comment,
+                    color: _showComments ? Colors.tealAccent : Colors.white70,
+                  ),
                   label: Text(
-                    '${_comments.length}',
-                    style: const TextStyle(color: Colors.white70),
+                    '${widget.sighting.commentCount}',
+                    style: TextStyle(
+                      color: _showComments ? Colors.tealAccent : Colors.white70,
+                    ),
                   ),
                 ),
               ),
               Expanded(
                 child: TextButton.icon(
                   onPressed: _shareSighting,
-                  icon: const Icon(Icons.share_outlined, color: Colors.white70),
-                  label: const Text(
-                    'Share',
-                    style: TextStyle(color: Colors.white70),
-                  ),
+                  icon: const Icon(Icons.share, color: Colors.white70),
+                  label: const Text('Share'),
                 ),
               ),
             ],
@@ -327,95 +337,155 @@ Shared via Aurora Viking App
   }
 
   Widget _buildHeader() {
-    return Row(
-      children: [
-        CircleAvatar(
-          radius: 20,
-          backgroundColor: Colors.grey[300],
-          child: Text(
-            widget.sighting.userName[0].toUpperCase(),
-            style: TextStyle(
-              color: Colors.grey[800],
-              fontWeight: FontWeight.bold,
-            ),
-          ),
-        ),
-        const SizedBox(width: 12),
-        Expanded(
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Text(
-                widget.sighting.userName,
+    return Padding(
+      padding: const EdgeInsets.all(8.0),
+      child: Row(
+        children: [
+          GestureDetector(
+            onTap: () => widget.onViewProfile.call(widget.sighting.userId),
+            child: CircleAvatar(
+              backgroundColor: Colors.tealAccent,
+              child: Text(
+                widget.sighting.userName[0].toUpperCase(),
                 style: const TextStyle(
+                  color: Colors.black,
                   fontWeight: FontWeight.bold,
-                  fontSize: 16,
                 ),
               ),
-              Text(
-                widget.sighting.timeAgo,
-                style: TextStyle(
-                  color: Colors.grey[600],
-                  fontSize: 12,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  widget.sighting.userName,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.bold,
+                  ),
+                ),
+                Text(
+                  widget.sighting.timeAgo,
+                  style: const TextStyle(
+                    color: Colors.white70,
+                    fontSize: 12,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          PopupMenuButton<String>(
+            icon: const Icon(Icons.more_vert, color: Colors.white),
+            onSelected: (value) {
+              switch (value) {
+                case 'report':
+                  _showReportDialog();
+                  break;
+                case 'profile':
+                  widget.onViewProfile.call(widget.sighting.userId);
+                  break;
+                case 'location':
+                  widget.onViewLocation.call(widget.sighting.location);
+                  break;
+              }
+            },
+            itemBuilder: (context) => [
+              const PopupMenuItem(
+                value: 'report',
+                child: Row(
+                  children: [
+                    Icon(Icons.flag, color: Colors.red),
+                    SizedBox(width: 8),
+                    Text('Report to Admin'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'profile',
+                child: Row(
+                  children: [
+                    Icon(Icons.person, color: Colors.tealAccent),
+                    SizedBox(width: 8),
+                    Text('Poster\'s Profile'),
+                  ],
+                ),
+              ),
+              const PopupMenuItem(
+                value: 'location',
+                child: Row(
+                  children: [
+                    Icon(Icons.location_on, color: Colors.tealAccent),
+                    SizedBox(width: 8),
+                    Text('Location on Map'),
+                  ],
                 ),
               ),
             ],
           ),
-        ),
-        PopupMenuButton<String>(
-          icon: const Icon(Icons.more_vert),
-          onSelected: (value) async {
-            switch (value) {
-              case 'report':
-                // TODO: Implement report functionality
-                break;
-              case 'profile':
-                if (widget.onViewProfile != null) {
-                  widget.onViewProfile!(widget.sighting.userId);
-                }
-                break;
-              case 'location':
-                if (widget.onViewLocation != null) {
-                  widget.onViewLocation!(widget.sighting.location);
-                }
-                break;
-            }
-          },
-          itemBuilder: (BuildContext context) => [
-            const PopupMenuItem<String>(
-              value: 'report',
-              child: Row(
-                children: [
-                  Icon(Icons.flag, color: Colors.red),
-                  SizedBox(width: 8),
-                  Text('Report to Admin'),
-                ],
-              ),
+        ],
+      ),
+    );
+  }
+
+  void _showReportDialog() {
+    showDialog(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Report Sighting'),
+        content: Column(
+          mainAxisSize: MainAxisSize.min,
+          children: [
+            ListTile(
+              leading: const Icon(Icons.warning, color: Colors.red),
+              title: const Text('Inappropriate Content'),
+              onTap: () => _submitReport('Inappropriate Content'),
             ),
-            const PopupMenuItem<String>(
-              value: 'profile',
-              child: Row(
-                children: [
-                  Icon(Icons.person),
-                  SizedBox(width: 8),
-                  Text('Poster\'s Profile'),
-                ],
-              ),
+            ListTile(
+              leading: const Icon(Icons.location_off, color: Colors.orange),
+              title: const Text('Incorrect Location'),
+              onTap: () => _submitReport('Incorrect Location'),
             ),
-            const PopupMenuItem<String>(
-              value: 'location',
-              child: Row(
-                children: [
-                  Icon(Icons.location_on),
-                  SizedBox(width: 8),
-                  Text('Location on Map'),
-                ],
-              ),
+            ListTile(
+              leading: const Icon(Icons.visibility_off, color: Colors.orange),
+              title: const Text('Not Aurora'),
+              onTap: () => _submitReport('Not Aurora'),
+            ),
+            ListTile(
+              leading: const Icon(Icons.more_horiz, color: Colors.grey),
+              title: const Text('Other'),
+              onTap: () => _submitReport('Other'),
             ),
           ],
         ),
-      ],
+      ),
     );
+  }
+
+  void _submitReport(String reason) {
+    Navigator.pop(context); // Close the dialog
+    _firebaseService.firestore.collection('reports').add({
+      'sightingId': widget.sighting.id,
+      'userId': _firebaseService.currentUser?.uid,
+      'reason': reason,
+      'timestamp': FieldValue.serverTimestamp(),
+      'status': 'pending',
+    }).then((_) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Report submitted successfully'),
+          backgroundColor: Colors.green,
+        ),
+      );
+    }).catchError((error) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Error submitting report: $error'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    });
   }
 
   Color _getIntensityColor(int intensity) {

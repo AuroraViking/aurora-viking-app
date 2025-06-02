@@ -9,8 +9,9 @@ import '../services/firebase_service.dart';
 import '../widgets/aurora_post_card.dart';
 import '../widgets/aurora_map.dart';
 import '../widgets/sign_in_widget.dart';
-import '../screens/spot_aurora_screen.dart';
-import '../screens/edit_profile_screen.dart';
+import 'spot_aurora_screen.dart';
+import 'edit_profile_screen.dart';
+import 'user_profile_screen.dart';
 
 class AuroraAlertsTab extends StatefulWidget {
   const AuroraAlertsTab({super.key});
@@ -29,257 +30,29 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
   bool _isLoading = true;
   bool _isLoadingLocation = true;
   String _activityLevel = 'No Recent Activity';
-
-  // Dark theme map style
-  static const String _darkMapStyle = '''
-[
-  {
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#1d2c4d"
-      }
-    ]
-  },
-  {
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#8ec3b9"
-      }
-    ]
-  },
-  {
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      {
-        "color": "#1a3646"
-      }
-    ]
-  },
-  {
-    "featureType": "administrative.country",
-    "elementType": "geometry.stroke",
-    "stylers": [
-      {
-        "color": "#4b6878"
-      }
-    ]
-  },
-  {
-    "featureType": "administrative.land_parcel",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#64779e"
-      }
-    ]
-  },
-  {
-    "featureType": "administrative.province",
-    "elementType": "geometry.stroke",
-    "stylers": [
-      {
-        "color": "#4b6878"
-      }
-    ]
-  },
-  {
-    "featureType": "landscape.man_made",
-    "elementType": "geometry.stroke",
-    "stylers": [
-      {
-        "color": "#334e87"
-      }
-    ]
-  },
-  {
-    "featureType": "landscape.natural",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#023e58"
-      }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#283d6a"
-      }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#6f9ba5"
-      }
-    ]
-  },
-  {
-    "featureType": "poi",
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      {
-        "color": "#1d2c4d"
-      }
-    ]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "geometry.fill",
-    "stylers": [
-      {
-        "color": "#023e58"
-      }
-    ]
-  },
-  {
-    "featureType": "poi.park",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#3C7680"
-      }
-    ]
-  },
-  {
-    "featureType": "road",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#304a7d"
-      }
-    ]
-  },
-  {
-    "featureType": "road",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#98a5be"
-      }
-    ]
-  },
-  {
-    "featureType": "road",
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      {
-        "color": "#1d2c4d"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#2c6675"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "geometry.stroke",
-    "stylers": [
-      {
-        "color": "#255763"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#b0d5ce"
-      }
-    ]
-  },
-  {
-    "featureType": "road.highway",
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      {
-        "color": "#023e58"
-      }
-    ]
-  },
-  {
-    "featureType": "transit",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#98a5be"
-      }
-    ]
-  },
-  {
-    "featureType": "transit",
-    "elementType": "labels.text.stroke",
-    "stylers": [
-      {
-        "color": "#1d2c4d"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.line",
-    "elementType": "geometry.fill",
-    "stylers": [
-      {
-        "color": "#283d6a"
-      }
-    ]
-  },
-  {
-    "featureType": "transit.station",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#3a4762"
-      }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "geometry",
-    "stylers": [
-      {
-        "color": "#0e1626"
-      }
-    ]
-  },
-  {
-    "featureType": "water",
-    "elementType": "labels.text.fill",
-    "stylers": [
-      {
-        "color": "#4e6d70"
-      }
-    ]
-  }
-]
-''';
-
+  GoogleMapController? _mapController;
 
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 4, vsync: this);
+    _tabController.addListener(_handleTabChange);
     _getCurrentLocation();
     _loadSightings();
   }
 
   @override
   void dispose() {
+    _tabController.removeListener(_handleTabChange);
     _tabController.dispose();
+    _mapController?.dispose();
     super.dispose();
+  }
+
+  void _handleTabChange() {
+    if (_tabController.indexIsChanging) {
+      setState(() {});
+    }
   }
 
   Future<void> _getCurrentLocation() async {
@@ -314,14 +87,18 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
     try {
       final recentSightings = await _firebaseService.getRecentSightings();
       final nearbySightings = await _firebaseService.getNearbySightings();
-      setState(() {
-        _recentSightings = recentSightings;
-        _nearbySightings = nearbySightings;
-        _isLoading = false;
-      });
+      if (mounted) {
+        setState(() {
+          _recentSightings = recentSightings;
+          _nearbySightings = nearbySightings;
+          _isLoading = false;
+        });
+      }
     } catch (e) {
       print('Error loading sightings: $e');
-      setState(() => _isLoading = false);
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
     }
   }
 
@@ -329,8 +106,6 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
     if (_currentLocation == null) return;
 
     try {
-      print('🗺️ Loading nearby sightings...');
-
       final now = DateTime.now();
       final twelveHoursAgo = now.subtract(const Duration(hours: 12));
 
@@ -350,124 +125,113 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
         setState(() {
           _nearbySightings = sightings;
         });
-
-        print('✅ Loaded ${sightings.length} nearby sightings');
       }
     } catch (e) {
-      print('❌ Error loading nearby sightings: $e');
+      print('Error loading nearby sightings: $e');
     }
   }
 
   Future<void> _refreshData() async {
-    setState(() {
-      _isLoading = true;
-    });
-
-    _loadSightings();
-    if (_currentLocation != null) {
-      await _loadNearbySightings();
-    }
+    setState(() => _isLoading = true);
+    await Future.wait([
+      _loadSightings(),
+      if (_currentLocation != null) _loadNearbySightings(),
+    ]);
   }
 
   @override
   Widget build(BuildContext context) {
-    return DefaultTabController(
-      length: 4,
-      child: Scaffold(
-        appBar: AppBar(
-          title: const Text('Aurora Sightings'),
-          bottom: const TabBar(
-            tabs: [
-              Tab(text: 'World'),
-              Tab(text: 'Nearby'),
-              Tab(text: 'Map'),
-              Tab(text: 'My Profile'),
-            ],
+    return Scaffold(
+      appBar: AppBar(
+        title: const Text('Aurora Sightings'),
+        bottom: TabBar(
+          controller: _tabController,
+          tabs: const [
+            Tab(text: 'World'),
+            Tab(text: 'Nearby'),
+            Tab(text: 'Map'),
+            Tab(text: 'My Profile'),
+          ],
+        ),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.add_a_photo),
+            onPressed: _navigateToSpotAurora,
           ),
-          actions: [
-            IconButton(
-              icon: const Icon(Icons.add_a_photo),
-              onPressed: _navigateToSpotAurora,
-            ),
-          ],
-        ),
-        body: TabBarView(
-          physics: const NeverScrollableScrollPhysics(),
-          children: [
-            _buildSightingsList(_recentSightings),
-            _buildSightingsList(_nearbySightings),
-            _buildMapView(),
-            _buildProfileView(),
-          ],
-        ),
+        ],
+      ),
+      body: TabBarView(
+        controller: _tabController,
+        physics: const NeverScrollableScrollPhysics(),
+        children: [
+          _buildSightingsList(_recentSightings),
+          _buildSightingsList(_nearbySightings),
+          _buildMapView(),
+          _buildProfileView(),
+        ],
       ),
     );
   }
 
   Widget _buildSightingsList(List<AuroraSighting> sightings) {
-    if (_isLoading) {
-      return const Center(child: CircularProgressIndicator());
-    }
-
-    if (sightings.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.visibility_off, size: 64, color: Colors.white54),
-            const SizedBox(height: 16),
-            const Text(
-              'No aurora sightings yet',
-              style: TextStyle(color: Colors.white70, fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
-              onPressed: _navigateToSpotAurora,
-              icon: const Icon(Icons.add_a_photo),
-              label: const Text('Spot Aurora'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.tealAccent,
-                foregroundColor: Colors.black,
-              ),
-            ),
-          ],
-        ),
-      );
-    }
-
     return RefreshIndicator(
-      onRefresh: () async {
-        await _loadSightings();
-      },
-      child: ListView.builder(
-        padding: const EdgeInsets.all(16),
-        itemCount: sightings.length,
-        itemBuilder: (context, index) {
-          final sighting = sightings[index];
-          return AuroraPostCard(
-            sighting: sighting,
-            onLike: (sightingId) async {
-              final result = await _firebaseService.confirmAuroraSighting(sightingId);
-              setState(() {
-                // Update both lists to ensure consistency
-                _updateSightingInList(_recentSightings, sightingId, result);
-                _updateSightingInList(_nearbySightings, sightingId, result);
-              });
-            },
-            onShare: (sightingId) {
-              // TODO: Implement share functionality
-            },
-            onViewProfile: (userId) {
-              // TODO: Navigate to user profile
-              print('View profile for user: $userId');
-            },
-            onViewLocation: (location) {
-              // TODO: Show location on map
-              print('Show location: ${location.latitude}, ${location.longitude}');
-            },
-          );
-        },
-      ),
+      onRefresh: _refreshData,
+      child: _isLoading
+          ? const Center(child: CircularProgressIndicator())
+          : ListView.builder(
+              padding: const EdgeInsets.all(16),
+              itemCount: sightings.length,
+              itemBuilder: (context, index) {
+                final sighting = sightings[index];
+                return AuroraPostCard(
+                  sighting: sighting,
+                  onLike: (sightingId) async {
+                    try {
+                      final result = await _firebaseService.confirmAuroraSighting(sightingId);
+                      if (mounted) {
+                        setState(() {
+                          final index = sightings.indexWhere((s) => s.id == sightingId);
+                          if (index != -1) {
+                            sightings[index] = sightings[index].copyWith(
+                              confirmations: result['confirmations'],
+                              confirmedByUsers: result['verifications'],
+                              isVerified: result['confirmations'] >= 3,
+                            );
+                          }
+                        });
+                      }
+                    } catch (e) {
+                      print('Error liking sighting: $e');
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(
+                          content: Text('Failed to like sighting. Please try again.'),
+                          backgroundColor: Colors.red,
+                        ),
+                      );
+                    }
+                  },
+                  onViewProfile: (userId) {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => UserProfileScreen(userId: userId),
+                      ),
+                    );
+                  },
+                  onViewLocation: (location) {
+                    _tabController.animateTo(2); // Switch to map tab
+                    Future.delayed(const Duration(milliseconds: 100), () {
+                      _mapController?.animateCamera(
+                        CameraUpdate.newLatLngZoom(
+                          LatLng(location.latitude, location.longitude),
+                          12,
+                        ),
+                      );
+                    });
+                  },
+                );
+              },
+            ),
     );
   }
 
@@ -481,21 +245,14 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.location_off, size: 64, color: Colors.white54),
-            const SizedBox(height: 16),
             const Text(
-              'Location access required',
-              style: TextStyle(color: Colors.white70, fontSize: 18),
+              'Location permission required to view map',
+              style: TextStyle(color: Colors.white70),
             ),
-            const SizedBox(height: 8),
-            ElevatedButton.icon(
+            const SizedBox(height: 16),
+            ElevatedButton(
               onPressed: _getCurrentLocation,
-              icon: const Icon(Icons.location_searching),
-              label: const Text('Enable Location'),
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.tealAccent,
-                foregroundColor: Colors.black,
-              ),
+              child: const Text('Grant Permission'),
             ),
           ],
         ),
@@ -504,163 +261,60 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
 
     return AuroraMap(
       currentLocation: _currentLocation!,
-      sightings: [..._recentSightings, ..._nearbySightings],
+      sightings: _nearbySightings,
+      onMapCreated: (controller) {
+        setState(() {
+          _mapController = controller;
+        });
+      },
       onSightingTapped: (sighting) {
-        // Show a bottom sheet with sighting details
         showModalBottomSheet(
           context: context,
-          backgroundColor: Colors.black.withOpacity(0.9),
-          shape: const RoundedRectangleBorder(
-            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-          ),
-          builder: (context) => DraggableScrollableSheet(
-            initialChildSize: 0.6,
-            minChildSize: 0.4,
-            maxChildSize: 0.9,
-            expand: false,
-            builder: (context, scrollController) => SingleChildScrollView(
-              controller: scrollController,
-              child: Padding(
-                padding: const EdgeInsets.all(16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // Header
-                    Row(
-                      children: [
-                        CircleAvatar(
-                          backgroundColor: _getIntensityColor(sighting.intensity),
-                          child: Text(
-                            sighting.intensity.toString(),
-                            style: const TextStyle(
-                              color: Colors.white,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ),
-                        const SizedBox(width: 12),
-                        Expanded(
-                          child: Column(
-                            crossAxisAlignment: CrossAxisAlignment.start,
-                            children: [
-                              Text(
-                                '${sighting.intensityDescription} Aurora',
-                                style: const TextStyle(
-                                  color: Colors.white,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
-                                ),
-                              ),
-                              Text(
-                                '${sighting.locationName} • ${sighting.timeAgo}',
-                                style: const TextStyle(color: Colors.white70),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ],
-                    ),
-                    const SizedBox(height: 16),
-
-                    // Photos
-                    if (sighting.photoUrls.isNotEmpty)
-                      SizedBox(
-                        height: 200,
-                        child: PageView.builder(
-                          itemCount: sighting.photoUrls.length,
-                          itemBuilder: (context, index) {
-                            return Image.network(
-                              sighting.photoUrls[index],
-                              fit: BoxFit.cover,
-                            );
-                          },
-                        ),
-                      ),
-
-                    const SizedBox(height: 16),
-
-                    // Description
-                    if (sighting.description != null && sighting.description!.isNotEmpty)
-                      Text(
-                        sighting.description!,
-                        style: const TextStyle(color: Colors.white),
-                      ),
-
-                    const SizedBox(height: 16),
-
-                    // Weather conditions
-                    if (sighting.weather.isNotEmpty)
-                      Row(
-                        children: [
-                          const Icon(Icons.thermostat, color: Colors.tealAccent, size: 16),
-                          const SizedBox(width: 8),
-                          Text(
-                            'BzH: ${sighting.weather['bzH']?.toStringAsFixed(1) ?? 'N/A'} nT • Kp: ${sighting.weather['kp']?.toStringAsFixed(1) ?? 'N/A'}',
-                            style: const TextStyle(color: Colors.white70, fontSize: 12),
-                          ),
-                        ],
-                      ),
-
-                    const SizedBox(height: 16),
-
-                    // Action buttons
-                    Row(
-                      children: [
-                        Expanded(
-                          child: TextButton.icon(
-                            onPressed: () async {
-                              await _firebaseService.confirmAuroraSighting(sighting.id);
-                              _loadSightings();
-                              if (mounted) Navigator.pop(context);
-                            },
-                            icon: Icon(
-                              sighting.confirmedByUsers.contains(_firebaseService.currentUser?.uid)
-                                  ? Icons.favorite
-                                  : Icons.favorite_border,
-                              color: sighting.confirmedByUsers.contains(_firebaseService.currentUser?.uid)
-                                  ? Colors.red
-                                  : Colors.white70,
-                            ),
-                            label: Text(
-                              '${sighting.confirmations}',
-                              style: TextStyle(
-                                color: sighting.confirmedByUsers.contains(_firebaseService.currentUser?.uid)
-                                    ? Colors.red
-                                    : Colors.white70,
-                              ),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: TextButton.icon(
-                            onPressed: () {
-                              // Handle comment action
-                            },
-                            icon: const Icon(Icons.comment_outlined, color: Colors.white70),
-                            label: const Text(
-                              'Comment',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                          ),
-                        ),
-                        Expanded(
-                          child: TextButton.icon(
-                            onPressed: () {
-                              // Handle share action
-                            },
-                            icon: const Icon(Icons.share_outlined, color: Colors.white70),
-                            label: const Text(
-                              'Share',
-                              style: TextStyle(color: Colors.white70),
-                            ),
-                          ),
-                        ),
-                      ],
-                    ),
-                  ],
+          builder: (context) => AuroraPostCard(
+            sighting: sighting,
+            onLike: (sightingId) async {
+              try {
+                final result = await _firebaseService.confirmAuroraSighting(sightingId);
+                if (mounted) {
+                  setState(() {
+                    final index = _nearbySightings.indexWhere((s) => s.id == sightingId);
+                    if (index != -1) {
+                      _nearbySightings[index] = _nearbySightings[index].copyWith(
+                        confirmations: result['confirmations'],
+                        confirmedByUsers: result['verifications'],
+                        isVerified: result['confirmations'] >= 3,
+                      );
+                    }
+                  });
+                }
+              } catch (e) {
+                print('Error liking sighting: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to like sighting. Please try again.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            onViewProfile: (userId) {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => UserProfileScreen(userId: userId),
                 ),
-              ),
-            ),
+              );
+            },
+            onViewLocation: (location) {
+              Navigator.pop(context);
+              _mapController?.animateCamera(
+                CameraUpdate.newLatLngZoom(
+                  LatLng(location.latitude, location.longitude),
+                  15,
+                ),
+              );
+            },
           ),
         );
       },
@@ -899,18 +553,5 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
         ),
       ),
     );
-  }
-
-  void _updateSightingInList(List<AuroraSighting> list, String sightingId, Map<String, dynamic> result) {
-    final index = list.indexWhere((s) => s.id == sightingId);
-    if (index != -1) {
-      list[index] = list[index].copyWith(
-        confirmations: result['confirmations'],
-        confirmedByUsers: result['isLiked'] 
-          ? [...list[index].confirmedByUsers, _firebaseService.currentUser!.uid]
-          : list[index].confirmedByUsers.where((id) => id != _firebaseService.currentUser!.uid).toList(),
-        isVerified: result['confirmations'] >= 3,
-      );
-    }
   }
 }

@@ -53,6 +53,8 @@ class UserPhotosService {
     required String locationName,
     required int intensity,
     required Map<String, dynamic> metadata,
+    required double latitude,
+    required double longitude,
     bool isPublic = true,
   }) async {
     final user = _auth.currentUser;
@@ -73,6 +75,10 @@ class UserPhotosService {
         isAvailableForPrint: true,
         printCount: 0,
         metadata: metadata,
+        latitude: latitude,
+        longitude: longitude,
+        confirmations: 0,
+        commentCount: 0,
       );
 
       final docRef = await _firestore

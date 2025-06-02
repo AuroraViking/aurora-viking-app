@@ -7,6 +7,7 @@ import '../services/user_photos_service.dart';
 import '../models/tour_photo.dart';
 import '../models/user_aurora_photo.dart';
 import '../screens/print_shop_tab.dart' as print_shop;
+import '../widgets/aurora_photo_viewer.dart';
 
 class MyPhotosTab extends StatefulWidget {
   const MyPhotosTab({super.key});
