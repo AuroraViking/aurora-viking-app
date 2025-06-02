@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import '../models/user_aurora_photo.dart';
 import '../services/firebase_service.dart';
+import '../services/user_photos_service.dart';
 
 class AuroraPhotoViewer extends StatefulWidget {
   final UserAuroraPhoto photo;
@@ -110,19 +111,9 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
 
   Future<void> _deletePhoto() async {
     try {
-      // Delete the photo from storage
-      await _firebaseService.storage.refFromURL(widget.photo.photoUrl).delete();
-      if (widget.photo.thumbnailUrl != widget.photo.photoUrl) {
-        await _firebaseService.storage.refFromURL(widget.photo.thumbnailUrl).delete();
-      }
-
-      // Delete the photo document
-      await _firebaseService.firestore
-          .collection('user_aurora_photos')
-          .doc(widget.photo.id)
-          .delete();
-
-      // Delete the associated sighting
+      // Delete the user photo (handles storage and Firestore)
+      await UserPhotosService.deletePhoto(widget.photo.id);
+      // Optionally, also delete the associated sighting
       await _firebaseService.firestore
           .collection('aurora_sightings')
           .doc(widget.photo.sightingId)
