@@ -4,14 +4,16 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
-import '../models/aurora_sighting.dart';
 import '../services/firebase_service.dart';
+import '../models/aurora_sighting.dart';
+import '../models/user_aurora_photo.dart';
 import '../widgets/aurora_post_card.dart';
 import '../widgets/aurora_map.dart';
 import '../widgets/sign_in_widget.dart';
 import 'spot_aurora_screen.dart';
 import 'edit_profile_screen.dart';
 import 'user_profile_screen.dart';
+import '../widgets/aurora_photo_viewer.dart';
 
 class AuroraAlertsTab extends StatefulWidget {
   const AuroraAlertsTab({super.key});
@@ -485,21 +487,155 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
                     );
                   }
 
+                  final photos = snapshot.data!.docs
+                      .map((doc) => UserAuroraPhoto.fromFirestore(doc))
+                      .toList();
+
                   return GridView.builder(
                     shrinkWrap: true,
                     physics: const NeverScrollableScrollPhysics(),
                     padding: const EdgeInsets.all(16),
                     gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                      crossAxisCount: 3,
-                      crossAxisSpacing: 8,
-                      mainAxisSpacing: 8,
+                      crossAxisCount: 2,
+                      crossAxisSpacing: 12,
+                      mainAxisSpacing: 12,
+                      childAspectRatio: 0.8,
                     ),
-                    itemCount: snapshot.data!.docs.length,
+                    itemCount: photos.length,
                     itemBuilder: (context, index) {
-                      final photo = snapshot.data!.docs[index].data() as Map<String, dynamic>;
-                      return Image.network(
-                        photo['photoUrl'] as String,
-                        fit: BoxFit.cover,
+                      final photo = photos[index];
+                      return GestureDetector(
+                        onTap: () {
+                          showModalBottomSheet(
+                            context: context,
+                            isScrollControlled: true,
+                            backgroundColor: Colors.transparent,
+                            builder: (context) => DraggableScrollableSheet(
+                              initialChildSize: 0.95,
+                              minChildSize: 0.7,
+                              maxChildSize: 0.95,
+                              expand: false,
+                              builder: (context, scrollController) => AuroraPhotoViewer(
+                                photo: photo,
+                              ),
+                            ),
+                          );
+                        },
+                        child: Container(
+                          decoration: BoxDecoration(
+                            borderRadius: BorderRadius.circular(12),
+                            border: Border.all(color: Colors.tealAccent.withOpacity(0.2)),
+                            boxShadow: [
+                              BoxShadow(
+                                color: Colors.black.withOpacity(0.3),
+                                blurRadius: 8,
+                                offset: const Offset(0, 4),
+                              ),
+                            ],
+                          ),
+                          child: ClipRRect(
+                            borderRadius: BorderRadius.circular(12),
+                            child: Stack(
+                              children: [
+                                Positioned.fill(
+                                  child: Image.network(
+                                    photo.photoUrl,
+                                    fit: BoxFit.cover,
+                                    loadingBuilder: (context, child, loadingProgress) {
+                                      if (loadingProgress == null) return child;
+                                      return Container(
+                                        color: Colors.grey.withOpacity(0.2),
+                                        child: const Center(
+                                          child: CircularProgressIndicator(color: Colors.tealAccent, strokeWidth: 2),
+                                        ),
+                                      );
+                                    },
+                                    errorBuilder: (context, error, stackTrace) {
+                                      return Container(
+                                        color: Colors.grey.withOpacity(0.2),
+                                        child: const Center(
+                                          child: Icon(Icons.broken_image, color: Colors.white54, size: 32),
+                                        ),
+                                      );
+                                    },
+                                  ),
+                                ),
+                                Positioned.fill(
+                                  child: Container(
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        begin: Alignment.topCenter,
+                                        end: Alignment.bottomCenter,
+                                        colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                // Likes and comments overlay
+                                Positioned(
+                                  bottom: 8,
+                                  left: 8,
+                                  right: 8,
+                                  child: Row(
+                                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                    children: [
+                                      Row(
+                                        children: [
+                                          Icon(Icons.favorite, color: Colors.redAccent, size: 16),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${photo.confirmations}',
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                          ),
+                                          const SizedBox(width: 12),
+                                          Icon(Icons.comment, color: Colors.tealAccent, size: 16),
+                                          const SizedBox(width: 4),
+                                          Text(
+                                            '${photo.commentCount}',
+                                            style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                                          ),
+                                        ],
+                                      ),
+                                      Container(
+                                        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: Colors.tealAccent.withOpacity(0.8),
+                                          borderRadius: BorderRadius.circular(10),
+                                        ),
+                                        child: Text(
+                                          '${photo.intensity}⭐',
+                                          style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
+                                        ),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                                // Location and date overlay
+                                Positioned(
+                                  top: 8,
+                                  left: 8,
+                                  right: 8,
+                                  child: Column(
+                                    crossAxisAlignment: CrossAxisAlignment.start,
+                                    mainAxisSize: MainAxisSize.min,
+                                    children: [
+                                      Text(
+                                        photo.locationName,
+                                        style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
+                                        maxLines: 1,
+                                        overflow: TextOverflow.ellipsis,
+                                      ),
+                                      Text(
+                                        photo.formattedDate,
+                                        style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10, shadows: [const Shadow(color: Colors.black, blurRadius: 4)]),
+                                      ),
+                                    ],
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                        ),
                       );
                     },
                   );

@@ -451,106 +451,136 @@ class _MyPhotosTabState extends State<MyPhotosTab>
   }
 
   Widget _buildUserPhotoCard(UserAuroraPhoto photo) {
-    return Container(
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: Colors.tealAccent.withOpacity(0.2)),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withOpacity(0.3),
-            blurRadius: 8,
-            offset: const Offset(0, 4),
+    return GestureDetector(
+      onTap: () {
+        showModalBottomSheet(
+          context: context,
+          isScrollControlled: true,
+          backgroundColor: Colors.transparent,
+          builder: (context) => DraggableScrollableSheet(
+            initialChildSize: 0.95,
+            minChildSize: 0.7,
+            maxChildSize: 0.95,
+            expand: false,
+            builder: (context, scrollController) => AuroraPhotoViewer(
+              photo: photo,
+            ),
           ),
-        ],
-      ),
-      child: ClipRRect(
-        borderRadius: BorderRadius.circular(12),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: Image.network(
-                photo.photoUrl,
-                fit: BoxFit.cover,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Container(
-                    color: Colors.grey.withOpacity(0.2),
-                    child: const Center(
-                      child: CircularProgressIndicator(color: Colors.tealAccent, strokeWidth: 2),
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return Container(
-                    color: Colors.grey.withOpacity(0.2),
-                    child: const Center(
-                      child: Icon(Icons.broken_image, color: Colors.white54, size: 32),
-                    ),
-                  );
-                },
-              ),
-            ),
-            Positioned.fill(
-              child: Container(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-                  ),
-                ),
-              ),
-            ),
-            Positioned(
-              bottom: 8,
-              left: 8,
-              right: 8,
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                    decoration: BoxDecoration(
-                      color: _getIntensityColor(photo.intensity).withOpacity(0.8),
-                      borderRadius: BorderRadius.circular(10),
-                    ),
-                    child: Text(
-                      '${photo.intensity}⭐',
-                      style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
-                    ),
-                  ),
-                  const SizedBox(height: 4),
-                  Text(
-                    photo.locationName,
-                    style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
-                  ),
-                  Text(
-                    photo.formattedDate,
-                    style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10),
-                  ),
-                ],
-              ),
-            ),
-            Positioned(
-              top: 8,
-              right: 8,
-              child: Container(
-                decoration: BoxDecoration(
-                  color: Colors.tealAccent.withOpacity(0.9),
-                  borderRadius: BorderRadius.circular(16),
-                ),
-                child: IconButton(
-                  onPressed: () => _openPrintShop(photo),
-                  icon: const Icon(Icons.print, color: Colors.black, size: 16),
-                  constraints: const BoxConstraints(minWidth: 32, minHeight: 32),
-                  tooltip: 'Print this photo',
-                ),
-              ),
+        );
+      },
+      child: Container(
+        decoration: BoxDecoration(
+          borderRadius: BorderRadius.circular(12),
+          border: Border.all(color: Colors.tealAccent.withOpacity(0.2)),
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.3),
+              blurRadius: 8,
+              offset: const Offset(0, 4),
             ),
           ],
+        ),
+        child: ClipRRect(
+          borderRadius: BorderRadius.circular(12),
+          child: Stack(
+            children: [
+              Positioned.fill(
+                child: Image.network(
+                  photo.photoUrl,
+                  fit: BoxFit.cover,
+                  loadingBuilder: (context, child, loadingProgress) {
+                    if (loadingProgress == null) return child;
+                    return Container(
+                      color: Colors.grey.withOpacity(0.2),
+                      child: const Center(
+                        child: CircularProgressIndicator(color: Colors.tealAccent, strokeWidth: 2),
+                      ),
+                    );
+                  },
+                  errorBuilder: (context, error, stackTrace) {
+                    return Container(
+                      color: Colors.grey.withOpacity(0.2),
+                      child: const Center(
+                        child: Icon(Icons.broken_image, color: Colors.white54, size: 32),
+                      ),
+                    );
+                  },
+                ),
+              ),
+              Positioned.fill(
+                child: Container(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
+                    ),
+                  ),
+                ),
+              ),
+              // Likes and comments overlay
+              Positioned(
+                bottom: 8,
+                left: 8,
+                right: 8,
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                  children: [
+                    Row(
+                      children: [
+                        Icon(Icons.favorite, color: Colors.redAccent, size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${photo.confirmations}',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                        const SizedBox(width: 12),
+                        Icon(Icons.comment, color: Colors.tealAccent, size: 16),
+                        const SizedBox(width: 4),
+                        Text(
+                          '${photo.commentCount}',
+                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
+                        ),
+                      ],
+                    ),
+                    Container(
+                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                      decoration: BoxDecoration(
+                        color: _getIntensityColor(photo.intensity).withOpacity(0.8),
+                        borderRadius: BorderRadius.circular(10),
+                      ),
+                      child: Text(
+                        '${photo.intensity}⭐',
+                        style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              // Location and date overlay
+              Positioned(
+                top: 8,
+                left: 8,
+                right: 8,
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    Text(
+                      photo.locationName,
+                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                    Text(
+                      photo.formattedDate,
+                      style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10, shadows: [const Shadow(color: Colors.black, blurRadius: 4)]),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
         ),
       ),
     );
