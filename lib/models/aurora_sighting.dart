@@ -66,21 +66,22 @@ class AuroraSighting {
       photoUrls = List<String>.from(data['photoUrls']);
     }
 
+    // Handle verifications
+    final verifications = List<String>.from(data['verifications'] ?? []);
+    final confirmations = verifications.length;
+
     return AuroraSighting(
       id: doc.id,
       userId: data['userId'] ?? '',
-      // Handle both userDisplayName and userName
       userName: data['userName'] ?? data['userDisplayName'] ?? 'Anonymous',
       timestamp: timestamp,
       location: location,
-      // Handle both address and locationName
       locationName: data['locationName'] ?? data['address'] ?? 'Unknown Location',
       intensity: data['intensity'] ?? 1,
       description: data['description'],
       photoUrls: photoUrls,
-      // Handle verifications as confirmations
-      confirmations: (data['verifications'] as List?)?.length ?? data['confirmations'] ?? 0,
-      confirmedByUsers: List<String>.from(data['verifications'] ?? data['confirmedByUsers'] ?? []),
+      confirmations: confirmations,
+      confirmedByUsers: verifications,
       isVerified: data['isVerified'] ?? false,
       weather: Map<String, dynamic>.from(data['weather'] ?? {}),
     );

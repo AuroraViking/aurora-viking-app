@@ -8,6 +8,8 @@ import 'dart:typed_data';
 import 'dart:math' as math;
 import '../services/user_photos_service.dart';
 import '../services/bokun_service.dart';
+import '../models/aurora_sighting.dart';
+import '../models/aurora_comment.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -329,11 +331,8 @@ class FirebaseService {
       final sightingRef = await firestore.collection('aurora_sightings').add({
         'userId': currentUser!.uid,
         'userDisplayName': userDisplayName,
-        'location': {
-          'latitude': latitude,
-          'longitude': longitude,
-          'address': address,
-        },
+        'location': GeoPoint(latitude, longitude),
+        'locationName': address,
         'intensity': intensity,
         'description': description,
         'photoUrl': photoUrl,
@@ -344,15 +343,18 @@ class FirebaseService {
           'solarWindSpeed': solarWindSpeed,
         },
         'verifications': <String>[],
+        'confirmations': 0,
         'isVerified': false,
         'reportCount': 0,
       });
 
-      // Update user's sighting count (only for authenticated users)
+      // Update user's profile with location and sighting count
       if (isAuthenticated) {
         await firestore.collection('users').doc(currentUser!.uid).update({
           'auroraSpottingCount': FieldValue.increment(1),
           'lastActive': FieldValue.serverTimestamp(),
+          'location': GeoPoint(latitude, longitude),
+          'lastLocationName': address,
         });
       }
 
@@ -669,28 +671,14 @@ class FirebaseService {
   }
 
   // Update profile picture
-  Future<String?> updateProfilePicture(File imageFile) async {
-    if (currentUser == null) return null;
+  Future<String> updateProfilePicture(File imageFile) async {
+    final user = currentUser;
+    if (user == null) throw Exception('User not authenticated');
 
-    try {
-      final fileName = 'profile_${currentUser!.uid}_${DateTime.now().millisecondsSinceEpoch}.jpg';
-      final ref = storage.ref().child('profile_pictures/$fileName');
-
-      final uploadTask = ref.putFile(imageFile);
-      final snapshot = await uploadTask;
-      final downloadUrl = await snapshot.ref.getDownloadURL();
-
-      // Update user profile with new picture URL
-      await firestore.collection('users').doc(currentUser!.uid).update({
-        'profilePictureUrl': downloadUrl,
-        'lastActive': FieldValue.serverTimestamp(),
-      });
-
-      return downloadUrl;
-    } catch (e) {
-      print('❌ Failed to update profile picture: $e');
-      return null;
-    }
+    final storageRef = storage.ref().child('profile_pictures/${user.uid}');
+    final uploadTask = storageRef.putFile(imageFile);
+    final snapshot = await uploadTask;
+    return await snapshot.ref.getDownloadURL();
   }
 
   // Get profile picture URL
@@ -704,5 +692,214 @@ class FirebaseService {
       print('❌ Failed to get profile picture URL: $e');
       return null;
     }
+  }
+
+  Future<List<AuroraComment>> getCommentsForSighting(String sightingId) async {
+    try {
+      final commentsSnapshot = await firestore
+          .collection('aurora_sightings')
+          .doc(sightingId)
+          .collection('comments')
+          .orderBy('timestamp', descending: true)
+          .get();
+
+      return commentsSnapshot.docs
+          .map((doc) => AuroraComment.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      print('Error getting comments: $e');
+      return [];
+    }
+  }
+
+  Future<void> addComment({
+    required String sightingId,
+    required String content,
+    String? parentCommentId,
+  }) async {
+    try {
+      final user = currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final userDoc = await firestore.collection('users').doc(user.uid).get();
+      final userName = userDoc.data()?['displayName'] ?? userDisplayName;
+
+      final comment = AuroraComment(
+        id: firestore.collection('aurora_sightings').doc().id,
+        sightingId: sightingId,
+        userId: user.uid,
+        userName: userName,
+        content: content,
+        timestamp: DateTime.now(),
+        likes: 0,
+        replies: 0,
+        parentCommentId: parentCommentId,
+      );
+
+      await firestore
+          .collection('aurora_sightings')
+          .doc(sightingId)
+          .collection('comments')
+          .doc(comment.id)
+          .set(comment.toFirestore());
+    } catch (e) {
+      print('Error adding comment: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<AuroraSighting>> getNearbySightings() async {
+    try {
+      final user = currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      // Get user's location from their last sighting or profile
+      final userDoc = await firestore.collection('users').doc(user.uid).get();
+      final userLocation = userDoc.data()?['location'] as GeoPoint?;
+
+      if (userLocation == null) {
+        // If no location in profile, try to get from last sighting
+        final lastSighting = await firestore
+            .collection('aurora_sightings')
+            .where('userId', isEqualTo: user.uid)
+            .orderBy('timestamp', descending: true)
+            .limit(1)
+            .get();
+
+        if (lastSighting.docs.isEmpty) {
+          return [];
+        }
+
+        final sightingData = lastSighting.docs.first.data();
+        final location = sightingData['location'] as GeoPoint;
+        final latitude = location.latitude;
+        final longitude = location.longitude;
+
+        // Get all recent sightings and filter by distance
+        final snapshot = await firestore
+            .collection('aurora_sightings')
+            .orderBy('timestamp', descending: true)
+            .limit(100)
+            .get();
+
+        return snapshot.docs
+            .map((doc) => AuroraSighting.fromFirestore(doc))
+            .where((sighting) {
+              final distance = _calculateDistance(
+                latitude, longitude,
+                sighting.location.latitude, sighting.location.longitude,
+              );
+              return distance <= 100; // 100km radius
+            })
+            .toList();
+      }
+
+      // If we have user location in profile, use that
+      final snapshot = await firestore
+          .collection('aurora_sightings')
+          .orderBy('timestamp', descending: true)
+          .limit(100)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => AuroraSighting.fromFirestore(doc))
+          .where((sighting) {
+            final distance = _calculateDistance(
+              userLocation.latitude, userLocation.longitude,
+              sighting.location.latitude, sighting.location.longitude,
+            );
+            return distance <= 100; // 100km radius
+          })
+          .toList();
+    } catch (e) {
+      print('Error getting nearby sightings: $e');
+      return [];
+    }
+  }
+
+  Future<Map<String, dynamic>> confirmAuroraSighting(String sightingId) async {
+    try {
+      final user = currentUser;
+      if (user == null) throw Exception('User not authenticated');
+
+      final sightingRef = firestore.collection('aurora_sightings').doc(sightingId);
+      
+      return await firestore.runTransaction((transaction) async {
+        final sightingDoc = await transaction.get(sightingRef);
+        if (!sightingDoc.exists) {
+          throw Exception('Sighting not found');
+        }
+
+        final data = sightingDoc.data() as Map<String, dynamic>;
+        final verifications = List<String>.from(data['verifications'] ?? []);
+        final isLiked = verifications.contains(user.uid);
+
+        if (isLiked) {
+          verifications.remove(user.uid);
+        } else {
+          verifications.add(user.uid);
+        }
+
+        final confirmations = verifications.length;
+
+        // Update the document with all necessary fields
+        transaction.update(sightingRef, {
+          'verifications': verifications,
+          'confirmations': confirmations,
+          'isVerified': confirmations >= 3,
+          'lastUpdated': FieldValue.serverTimestamp(),
+        });
+
+        // Also update the user's verification count
+        if (isAuthenticated) {
+          transaction.update(
+            firestore.collection('users').doc(user.uid),
+            {
+              'verificationCount': FieldValue.increment(isLiked ? -1 : 1),
+              'lastActive': FieldValue.serverTimestamp(),
+            },
+          );
+        }
+
+        return {
+          'isLiked': !isLiked,
+          'confirmations': confirmations,
+        };
+      });
+    } catch (e) {
+      print('Error confirming sighting: $e');
+      rethrow;
+    }
+  }
+
+  Future<List<AuroraSighting>> getRecentSightings() async {
+    try {
+      final now = DateTime.now();
+      final twelveHoursAgo = now.subtract(const Duration(hours: 12));
+
+      final snapshot = await firestore
+          .collection('aurora_sightings')
+          .where('timestamp', isGreaterThan: twelveHoursAgo)
+          .orderBy('timestamp', descending: true)
+          .limit(50)
+          .get();
+
+      return snapshot.docs
+          .map((doc) => AuroraSighting.fromFirestore(doc))
+          .toList();
+    } catch (e) {
+      print('Error getting recent sightings: $e');
+      return [];
+    }
+  }
+
+  Future<String> uploadBannerImage(File imageFile) async {
+    final user = currentUser;
+    if (user == null) throw Exception('User not authenticated');
+
+    final storageRef = storage.ref().child('banner_images/${user.uid}');
+    final uploadTask = storageRef.putFile(imageFile);
+    final snapshot = await uploadTask;
+    return await snapshot.ref.getDownloadURL();
   }
 }

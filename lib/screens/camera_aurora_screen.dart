@@ -17,11 +17,13 @@ import '../services/aurora_message_service.dart';
 class CameraAuroraScreen extends StatefulWidget {
   final double currentBzH;
   final double currentKp;
+  final String? initialImagePath;
 
   const CameraAuroraScreen({
     super.key,
     required this.currentBzH,
     required this.currentKp,
+    this.initialImagePath,
   });
 
   @override
@@ -114,6 +116,16 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
 
   Future<void> _initializeCamera() async {
     try {
+      if (widget.initialImagePath != null) {
+        setState(() {
+          _capturedPhoto = File(widget.initialImagePath!);
+          _showCaptureUI = true;
+          _showDetailsForm = true;
+        });
+        _slideController.forward();
+        return;
+      }
+
       // Request camera permission
       final cameraStatus = await Permission.camera.request();
       if (cameraStatus != PermissionStatus.granted) {
@@ -200,11 +212,19 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           _currentPosition = position;
           if (placemarks.isNotEmpty) {
             final place = placemarks.first;
-            final city = place.locality ?? place.subAdministrativeArea ?? '';
+            final locality = place.locality ?? '';
+            final subAdminArea = place.subAdministrativeArea ?? '';
+            final adminArea = place.administrativeArea ?? '';
             final country = place.country ?? '';
-            _locationName = city.isNotEmpty && country.isNotEmpty
-                ? '$city, $country'
-                : 'Location found';
+            
+            // Build location name with available information
+            final locationParts = <String>[];
+            if (locality.isNotEmpty) locationParts.add(locality);
+            if (subAdminArea.isNotEmpty && subAdminArea != locality) locationParts.add(subAdminArea);
+            if (adminArea.isNotEmpty && adminArea != locality && adminArea != subAdminArea) locationParts.add(adminArea);
+            if (country.isNotEmpty) locationParts.add(country);
+            
+            _locationName = locationParts.isNotEmpty ? locationParts.join(', ') : 'Location found';
           } else {
             _locationName = 'Location found';
           }

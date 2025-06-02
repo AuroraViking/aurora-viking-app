@@ -1,6 +1,9 @@
 # Environment files
 .env
-.env.*
+.env.local
+.env.development
+.env.test
+.env.production
 
 # Flutter/Dart specific
 .dart_tool/
@@ -61,3 +64,18 @@ app.*.symbols
 
 # Obfuscation related
 app.*.map.json
+
+# Web related
+lib/generated_plugin_registrant.dart
+
+# Firebase configuration
+google-services.json
+GoogleService-Info.plist
+firebase_options.dart
+
+# Coverage
+coverage/
+
+# Temporary files
+*.tmp
+*.temp

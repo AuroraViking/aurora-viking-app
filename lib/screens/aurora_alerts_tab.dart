@@ -6,10 +6,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/aurora_sighting.dart';
 import '../services/firebase_service.dart';
-import '../widgets/sighting_card.dart';
+import '../widgets/aurora_post_card.dart';
 import '../widgets/aurora_map.dart';
 import '../widgets/sign_in_widget.dart';
 import '../screens/spot_aurora_screen.dart';
+import '../screens/edit_profile_screen.dart';
 
 class AuroraAlertsTab extends StatefulWidget {
   const AuroraAlertsTab({super.key});
@@ -270,7 +271,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
+    _tabController = TabController(length: 4, vsync: this);
     _getCurrentLocation();
     _loadSightings();
   }
@@ -308,60 +309,20 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
     }
   }
 
-  void _loadSightings() {
-    print('🔄 Loading aurora sightings...');
-
-    _firebaseService.getAuroraSightingsStream(limit: 50).listen(
-          (QuerySnapshot snapshot) {
-        print('📊 Received ${snapshot.docs.length} sightings from Firebase');
-
-        if (mounted) {
-          final now = DateTime.now();
-          final twelveHoursAgo = now.subtract(const Duration(hours: 12));
-
-          final sightings = snapshot.docs
-              .map((doc) => AuroraSighting.fromFirestore(doc))
-              .where((sighting) => sighting.timestamp.isAfter(twelveHoursAgo))
-              .toList();
-
-          setState(() {
-            _recentSightings = sightings;
-            _activityLevel = _calculateActivityLevel(sightings);
-            _isLoading = false;
-          });
-
-          print('✅ Loaded ${sightings.length} recent sightings');
-        }
-      },
-      onError: (error) {
-        print('❌ Error loading sightings: $error');
-        if (mounted) {
-          setState(() {
-            _isLoading = false;
-            _activityLevel = 'Error Loading Data';
-          });
-        }
-      },
-    );
-  }
-
-  String _calculateActivityLevel(List<AuroraSighting> sightings) {
-    if (sightings.isEmpty) return 'No Recent Activity';
-
-    final now = DateTime.now();
-    final last12Hours = now.subtract(const Duration(hours: 12));
-
-    final recentSightings = sightings.where((sighting) {
-      return sighting.timestamp.isAfter(last12Hours);
-    }).toList();
-
-    final count = recentSightings.length;
-
-    if (count >= 10) return 'Exceptional Activity';
-    if (count >= 6) return 'High Activity';
-    if (count >= 3) return 'Moderate Activity';
-    if (count >= 1) return 'Low Activity';
-    return 'Minimal Activity';
+  Future<void> _loadSightings() async {
+    setState(() => _isLoading = true);
+    try {
+      final recentSightings = await _firebaseService.getRecentSightings();
+      final nearbySightings = await _firebaseService.getNearbySightings();
+      setState(() {
+        _recentSightings = recentSightings;
+        _nearbySightings = nearbySightings;
+        _isLoading = false;
+      });
+    } catch (e) {
+      print('Error loading sightings: $e');
+      setState(() => _isLoading = false);
+    }
   }
 
   Future<void> _loadNearbySightings() async {
@@ -410,308 +371,42 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
 
   @override
   Widget build(BuildContext context) {
-    return StreamBuilder<User?>(
-      stream: _firebaseService.auth.authStateChanges(),
-      builder: (context, authSnapshot) {
-        return Scaffold(
-          backgroundColor: Colors.black,
-          body: SafeArea(
-            child: Column(
-              children: [
-                _buildHeader(),
-                _buildActivityBanner(),
-
-                if (!_firebaseService.isAuthenticated) ...[
-                  Expanded(
-                    child: Padding(
-                      padding: const EdgeInsets.all(16),
-                      child: SignInWidget(
-                        onSignedIn: () {
-                          setState(() {});
-                          _loadSightings();
-                        },
-                      ),
-                    ),
-                  ),
-                ] else ...[
-                  _buildTabBar(),
-                  Expanded(
-                    child: TabBarView(
-                      controller: _tabController,
-                      physics: const NeverScrollableScrollPhysics(),
-                      children: [
-                        _buildMapView(),
-                        _buildSightingsList(_recentSightings, 'recent'),
-                        _buildSightingsList(_nearbySightings, 'nearby'),
-                      ],
-                    ),
-                  ),
-                ],
-              ],
-            ),
+    return DefaultTabController(
+      length: 4,
+      child: Scaffold(
+        appBar: AppBar(
+          title: const Text('Aurora Sightings'),
+          bottom: const TabBar(
+            tabs: [
+              Tab(text: 'World'),
+              Tab(text: 'Nearby'),
+              Tab(text: 'Map'),
+              Tab(text: 'My Profile'),
+            ],
           ),
-          floatingActionButton: _firebaseService.isAuthenticated
-              ? FloatingActionButton.extended(
-                  onPressed: _navigateToSpotAurora,
-                  backgroundColor: Colors.tealAccent,
-                  icon: const Icon(Icons.camera_alt, color: Colors.black),
-                  label: const Text(
-                    'Spot Aurora',
-                    style: TextStyle(color: Colors.black, fontWeight: FontWeight.bold),
-                  ),
-                )
-              : null,
-        );
-      },
-    );
-  }
-
-  Widget _buildHeader() {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      child: Row(
-        children: [
-          const Text(
-            'Aurora Community',
-            style: TextStyle(
-              fontSize: 20,
-              fontWeight: FontWeight.bold,
-              color: Colors.tealAccent,
-              shadows: [Shadow(color: Colors.tealAccent, blurRadius: 8)],
-            ),
-          ),
-          const Spacer(),
-          if (_isLoading && _recentSightings.isEmpty)
-            const SizedBox(
-              width: 20,
-              height: 20,
-              child: CircularProgressIndicator(
-                strokeWidth: 2,
-                color: Colors.tealAccent,
-              ),
-            )
-          else
+          actions: [
             IconButton(
-              onPressed: _refreshData,
-              icon: const Icon(Icons.refresh, color: Colors.tealAccent),
+              icon: const Icon(Icons.add_a_photo),
+              onPressed: _navigateToSpotAurora,
             ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildActivityBanner() {
-    final activityColor = _getActivityColor(_activityLevel);
-
-    return Container(
-      margin: const EdgeInsets.symmetric(horizontal: 16),
-      padding: const EdgeInsets.all(12),
-      decoration: BoxDecoration(
-        gradient: LinearGradient(
-          colors: [
-            activityColor.withOpacity(0.2),
-            activityColor.withOpacity(0.1),
           ],
         ),
-        borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: activityColor.withOpacity(0.5)),
-      ),
-      child: Row(
-        children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(
-              shape: BoxShape.circle,
-              color: activityColor,
-              boxShadow: [
-                BoxShadow(
-                  color: activityColor.withOpacity(0.5),
-                  blurRadius: 8,
-                  spreadRadius: 2,
-                ),
-              ],
-            ),
-          ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  'Current Activity: $_activityLevel',
-                  style: TextStyle(
-                    color: activityColor,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                Text(
-                  '${_recentSightings.length} sightings in last 12h',
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 12,
-                  ),
-                ),
-              ],
-            ),
-          ),
-          Icon(
-            Icons.trending_up,
-            color: activityColor,
-            size: 20,
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildTabBar() {
-    return Container(
-      margin: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.1),
-        borderRadius: BorderRadius.circular(25),
-      ),
-      child: TabBar(
-        controller: _tabController,
-        indicator: BoxDecoration(
-          color: Colors.tealAccent,
-          borderRadius: BorderRadius.circular(25),
-        ),
-        labelColor: Colors.black,
-        unselectedLabelColor: Colors.white70,
-        labelStyle: const TextStyle(fontWeight: FontWeight.bold, fontSize: 12),
-        tabs: const [
-          Tab(icon: Icon(Icons.map, size: 16), text: 'Map'),
-          Tab(icon: Icon(Icons.access_time, size: 16), text: 'Recent'),
-          Tab(icon: Icon(Icons.location_on, size: 16), text: 'Nearby'),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildMapView() {
-    if (_isLoadingLocation) {
-      return const Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
+        body: TabBarView(
+          physics: const NeverScrollableScrollPhysics(),
           children: [
-            CircularProgressIndicator(color: Colors.tealAccent),
-            SizedBox(height: 16),
-            Text(
-              'Getting your location...',
-              style: TextStyle(color: Colors.white70),
-            ),
+            _buildSightingsList(_recentSightings),
+            _buildSightingsList(_nearbySightings),
+            _buildMapView(),
+            _buildProfileView(),
           ],
         ),
-      );
-    }
-
-    if (_currentLocation == null) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Icon(Icons.location_off, color: Colors.white54, size: 64),
-            const SizedBox(height: 16),
-            const Text(
-              'Location access needed',
-              style: TextStyle(color: Colors.white70, fontSize: 18),
-            ),
-            const SizedBox(height: 8),
-            ElevatedButton(
-              onPressed: _getCurrentLocation,
-              style: ElevatedButton.styleFrom(
-                backgroundColor: Colors.tealAccent,
-                foregroundColor: Colors.black,
-              ),
-              child: const Text('Enable Location'),
-            ),
-          ],
-        ),
-      );
-    }
-
-    return GoogleMap(
-      initialCameraPosition: CameraPosition(
-        target: LatLng(_currentLocation!.latitude, _currentLocation!.longitude),
-        zoom: 8.0,
       ),
-      myLocationEnabled: true,
-      myLocationButtonEnabled: true,
-      zoomControlsEnabled: true,
-      zoomGesturesEnabled: true,
-      scrollGesturesEnabled: true,
-      tiltGesturesEnabled: true,
-      rotateGesturesEnabled: true,
-      compassEnabled: true,
-      mapToolbarEnabled: true,
-      mapType: MapType.normal,
-      markers: _buildMapMarkers(),
-      style: _darkMapStyle, // Added dark theme
-      onMapCreated: (GoogleMapController controller) {
-        print('🗺️ Map created successfully');
-      },
-      onTap: (LatLng position) {
-        print('Map tapped at: ${position.latitude}, ${position.longitude}');
-      },
     );
   }
 
-  Set<Marker> _buildMapMarkers() {
-    final markers = <Marker>{};
-
-    for (int i = 0; i < _recentSightings.length; i++) {
-      final sighting = _recentSightings[i];
-      markers.add(
-        Marker(
-          markerId: MarkerId('sighting_$i'),
-          position: LatLng(
-            sighting.location.latitude,
-            sighting.location.longitude,
-          ),
-          infoWindow: InfoWindow(
-            title: '${sighting.intensityDescription} Aurora',
-            snippet: sighting.locationName,
-          ),
-          icon: BitmapDescriptor.defaultMarkerWithHue(
-            _getMarkerHue(sighting.intensity),
-          ),
-          onTap: () => _showSightingDetails(sighting),
-        ),
-      );
-    }
-
-    return markers;
-  }
-
-  double _getMarkerHue(int intensity) {
-    switch (intensity) {
-      case 1: return BitmapDescriptor.hueBlue;
-      case 2: return BitmapDescriptor.hueGreen;
-      case 3: return BitmapDescriptor.hueCyan;
-      case 4: return BitmapDescriptor.hueOrange;
-      case 5: return BitmapDescriptor.hueRed;
-      default: return BitmapDescriptor.hueViolet;
-    }
-  }
-
-  Widget _buildSightingsList(List<AuroraSighting> sightings, String type) {
-    if (_isLoading && sightings.isEmpty) {
-      return Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const CircularProgressIndicator(color: Colors.tealAccent),
-            const SizedBox(height: 16),
-            Text(
-              'Loading $type sightings...',
-              style: const TextStyle(color: Colors.white70),
-            ),
-          ],
-        ),
-      );
+  Widget _buildSightingsList(List<AuroraSighting> sightings) {
+    if (_isLoading) {
+      return const Center(child: CircularProgressIndicator());
     }
 
     if (sightings.isEmpty) {
@@ -719,16 +414,21 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            const Icon(Icons.search_off, size: 64, color: Colors.white30),
+            const Icon(Icons.visibility_off, size: 64, color: Colors.white54),
             const SizedBox(height: 16),
-            Text(
-              type == 'recent' ? 'No recent aurora sightings' : 'No nearby aurora sightings',
-              style: const TextStyle(color: Colors.white70, fontSize: 18),
+            const Text(
+              'No aurora sightings yet',
+              style: TextStyle(color: Colors.white70, fontSize: 18),
             ),
             const SizedBox(height: 8),
-            const Text(
-              'Be the first to spot aurora in your area!',
-              style: TextStyle(color: Colors.white54, fontSize: 14),
+            ElevatedButton.icon(
+              onPressed: _navigateToSpotAurora,
+              icon: const Icon(Icons.add_a_photo),
+              label: const Text('Spot Aurora'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.tealAccent,
+                foregroundColor: Colors.black,
+              ),
             ),
           ],
         ),
@@ -736,459 +436,446 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
     }
 
     return RefreshIndicator(
-      onRefresh: _refreshData,
-      color: Colors.tealAccent,
-      backgroundColor: Colors.black,
+      onRefresh: () async {
+        await _loadSightings();
+      },
       child: ListView.builder(
         padding: const EdgeInsets.all(16),
         itemCount: sightings.length,
         itemBuilder: (context, index) {
           final sighting = sightings[index];
-          return Card(
-            color: Colors.white.withOpacity(0.05),
-            margin: const EdgeInsets.only(bottom: 12),
-            child: ListTile(
-              leading: CircleAvatar(
-                backgroundColor: _getIntensityColor(sighting.intensity),
-                child: Text(
-                  sighting.intensity.toString(),
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-              title: Text(
-                '${sighting.intensityDescription} Aurora',
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontWeight: FontWeight.bold,
-                ),
-              ),
-              subtitle: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Text(
-                    sighting.locationName,
-                    style: const TextStyle(color: Colors.white70),
-                  ),
-                  Text(
-                    'by ${sighting.userName} • ${sighting.timeAgo}',
-                    style: const TextStyle(color: Colors.white54, fontSize: 12),
-                  ),
-                ],
-              ),
-              trailing: const Icon(Icons.arrow_forward_ios, color: Colors.white54, size: 16),
-              onTap: () => _showSightingDetails(sighting),
-            ),
+          return AuroraPostCard(
+            sighting: sighting,
+            onLike: (sightingId) async {
+              final result = await _firebaseService.confirmAuroraSighting(sightingId);
+              setState(() {
+                // Update both lists to ensure consistency
+                _updateSightingInList(_recentSightings, sightingId, result);
+                _updateSightingInList(_nearbySightings, sightingId, result);
+              });
+            },
+            onShare: (sightingId) {
+              // TODO: Implement share functionality
+            },
+            onViewProfile: (userId) {
+              // TODO: Navigate to user profile
+              print('View profile for user: $userId');
+            },
+            onViewLocation: (location) {
+              // TODO: Show location on map
+              print('Show location: ${location.latitude}, ${location.longitude}');
+            },
           );
         },
       ),
     );
   }
 
-  void _showSightingDetails(AuroraSighting sighting) {
-    showModalBottomSheet(
-      context: context,
-      backgroundColor: Colors.transparent,
-      isScrollControlled: true,
-      builder: (context) => Container(
-        height: MediaQuery.of(context).size.height * 0.8,
-        decoration: BoxDecoration(
-          color: Colors.black,
-          borderRadius: const BorderRadius.vertical(top: Radius.circular(20)),
-          border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
-        ),
+  Widget _buildMapView() {
+    if (_isLoadingLocation) {
+      return const Center(child: CircularProgressIndicator());
+    }
+
+    if (_currentLocation == null) {
+      return Center(
         child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
           children: [
-            Container(
-              margin: const EdgeInsets.only(top: 8),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white54,
-                borderRadius: BorderRadius.circular(2),
-              ),
+            const Icon(Icons.location_off, size: 64, color: Colors.white54),
+            const SizedBox(height: 16),
+            const Text(
+              'Location access required',
+              style: TextStyle(color: Colors.white70, fontSize: 18),
             ),
-
-            Padding(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Container(
-                    width: 40,
-                    height: 40,
-                    decoration: BoxDecoration(
-                      shape: BoxShape.circle,
-                      color: _getIntensityColor(sighting.intensity),
-                    ),
-                    child: Center(
-                      child: Text(
-                        sighting.intensity.toString(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontWeight: FontWeight.bold,
-                          fontSize: 18,
-                        ),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        Text(
-                          '${sighting.intensityDescription} Aurora',
-                          style: const TextStyle(
-                            color: Colors.white,
-                            fontSize: 20,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                        Text(
-                          'by ${sighting.userName} • ${sighting.timeAgo}',
-                          style: const TextStyle(color: Colors.white70),
-                        ),
-                      ],
-                    ),
-                  ),
-                  if (sighting.isVerified)
-                    Container(
-                      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
-                      decoration: BoxDecoration(
-                        color: Colors.tealAccent.withOpacity(0.2),
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.tealAccent.withOpacity(0.5)),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          Icon(Icons.verified, color: Colors.tealAccent, size: 14),
-                          SizedBox(width: 4),
-                          Text(
-                            'Verified',
-                            style: TextStyle(
-                              color: Colors.tealAccent,
-                              fontSize: 12,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                ],
-              ),
-            ),
-
-            Expanded(
-              child: SingleChildScrollView(
-                padding: const EdgeInsets.symmetric(horizontal: 16),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    _buildDetailRow(
-                      'Location',
-                      '${sighting.locationName}\n${sighting.formattedCoordinates}',
-                      Icons.location_on,
-                    ),
-
-                    if (sighting.weather.isNotEmpty)
-                      _buildDetailRow(
-                        'Aurora Conditions',
-                        'BzH: ${sighting.weather['bzH']?.toStringAsFixed(1) ?? 'N/A'} nT\nKp: ${sighting.weather['kp']?.toStringAsFixed(1) ?? 'N/A'}',
-                        Icons.thermostat,
-                      ),
-
-                    if (sighting.description != null && sighting.description!.isNotEmpty)
-                      _buildDetailRow(
-                        'Description',
-                        sighting.description!,
-                        Icons.description,
-                      ),
-
-                    if (sighting.photoUrls.isNotEmpty) ...[
-                      const SizedBox(height: 16),
-                      const Row(
-                        children: [
-                          Icon(Icons.photo_library, color: Colors.tealAccent, size: 20),
-                          SizedBox(width: 12),
-                          Text(
-                            'Aurora Photos',
-                            style: TextStyle(
-                              color: Colors.tealAccent,
-                              fontSize: 16,
-                              fontWeight: FontWeight.bold,
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        height: 200,
-                        child: ListView.builder(
-                          scrollDirection: Axis.horizontal,
-                          itemCount: sighting.photoUrls.length,
-                          itemBuilder: (context, index) {
-                            return Container(
-                              width: 200,
-                              margin: const EdgeInsets.only(right: 12),
-                              child: ClipRRect(
-                                borderRadius: BorderRadius.circular(12),
-                                child: Stack(
-                                  children: [
-                                    Image.network(
-                                      sighting.photoUrls[index],
-                                      width: 200,
-                                      height: 200,
-                                      fit: BoxFit.cover,
-                                      loadingBuilder: (context, child, loadingProgress) {
-                                        if (loadingProgress == null) return child;
-                                        return Container(
-                                          width: 200,
-                                          height: 200,
-                                          color: Colors.grey.withOpacity(0.2),
-                                          child: Center(
-                                            child: CircularProgressIndicator(
-                                              color: Colors.tealAccent,
-                                              strokeWidth: 2,
-                                              value: loadingProgress.expectedTotalBytes != null
-                                                  ? loadingProgress.cumulativeBytesLoaded /
-                                                  loadingProgress.expectedTotalBytes!
-                                                  : null,
-                                            ),
-                                          ),
-                                        );
-                                      },
-                                      errorBuilder: (context, error, stackTrace) {
-                                        print('❌ Error loading image: $error');
-                                        return Container(
-                                          width: 200,
-                                          height: 200,
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey.withOpacity(0.2),
-                                            borderRadius: BorderRadius.circular(12),
-                                          ),
-                                          child: const Column(
-                                            mainAxisAlignment: MainAxisAlignment.center,
-                                            children: [
-                                              Icon(
-                                                Icons.broken_image,
-                                                color: Colors.white54,
-                                                size: 40,
-                                              ),
-                                              SizedBox(height: 8),
-                                              Text(
-                                                'Failed to load image',
-                                                style: TextStyle(
-                                                  color: Colors.white54,
-                                                  fontSize: 12,
-                                                ),
-                                                textAlign: TextAlign.center,
-                                              ),
-                                            ],
-                                          ),
-                                        );
-                                      },
-                                    ),
-                                    Positioned.fill(
-                                      child: Material(
-                                        color: Colors.transparent,
-                                        child: InkWell(
-                                          onTap: () => _showFullScreenImage(sighting.photoUrls[index]),
-                                          child: Container(),
-                                        ),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            );
-                          },
-                        ),
-                      ),
-                    ],
-
-                    const SizedBox(height: 32),
-                  ],
-                ),
-              ),
-            ),
-
-            Container(
-              padding: const EdgeInsets.all(16),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: OutlinedButton.icon(
-                      onPressed: () => _confirmSighting(sighting),
-                      icon: const Icon(Icons.thumb_up_outlined, size: 16),
-                      label: Text('Confirm (${sighting.confirmations})'),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.tealAccent,
-                        side: BorderSide(color: Colors.tealAccent.withOpacity(0.5)),
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                  const SizedBox(width: 12),
-                  Expanded(
-                    child: ElevatedButton.icon(
-                      onPressed: () {
-                        Navigator.pop(context);
-                        _openCameraAtLocation(sighting.location);
-                      },
-                      icon: const Icon(Icons.add_a_photo, size: 16),
-                      label: const Text('Spot Here Too'),
-                      style: ElevatedButton.styleFrom(
-                        backgroundColor: Colors.tealAccent,
-                        foregroundColor: Colors.black,
-                        padding: const EdgeInsets.symmetric(vertical: 12),
-                      ),
-                    ),
-                  ),
-                ],
+            const SizedBox(height: 8),
+            ElevatedButton.icon(
+              onPressed: _getCurrentLocation,
+              icon: const Icon(Icons.location_searching),
+              label: const Text('Enable Location'),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.tealAccent,
+                foregroundColor: Colors.black,
               ),
             ),
           ],
         ),
-      ),
-    );
-  }
+      );
+    }
 
-  void _showFullScreenImage(String imageUrl) {
-    Navigator.of(context).push(
-      MaterialPageRoute(
-        builder: (context) => Scaffold(
-          backgroundColor: Colors.black,
-          appBar: AppBar(
-            backgroundColor: Colors.transparent,
-            elevation: 0,
-            leading: IconButton(
-              icon: const Icon(Icons.close, color: Colors.white),
-              onPressed: () => Navigator.pop(context),
-            ),
+    return AuroraMap(
+      currentLocation: _currentLocation!,
+      sightings: [..._recentSightings, ..._nearbySightings],
+      onSightingTapped: (sighting) {
+        // Show a bottom sheet with sighting details
+        showModalBottomSheet(
+          context: context,
+          backgroundColor: Colors.black.withOpacity(0.9),
+          shape: const RoundedRectangleBorder(
+            borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
           ),
-          body: Center(
-            child: InteractiveViewer(
-              child: Image.network(
-                imageUrl,
-                fit: BoxFit.contain,
-                loadingBuilder: (context, child, loadingProgress) {
-                  if (loadingProgress == null) return child;
-                  return Center(
-                    child: CircularProgressIndicator(
-                      color: Colors.tealAccent,
-                      value: loadingProgress.expectedTotalBytes != null
-                          ? loadingProgress.cumulativeBytesLoaded /
-                          loadingProgress.expectedTotalBytes!
-                          : null,
-                    ),
-                  );
-                },
-                errorBuilder: (context, error, stackTrace) {
-                  return const Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
+          builder: (context) => DraggableScrollableSheet(
+            initialChildSize: 0.6,
+            minChildSize: 0.4,
+            maxChildSize: 0.9,
+            expand: false,
+            builder: (context, scrollController) => SingleChildScrollView(
+              controller: scrollController,
+              child: Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    // Header
+                    Row(
                       children: [
-                        Icon(Icons.broken_image, color: Colors.white54, size: 64),
-                        SizedBox(height: 16),
-                        Text(
-                          'Failed to load image',
-                          style: TextStyle(color: Colors.white70),
+                        CircleAvatar(
+                          backgroundColor: _getIntensityColor(sighting.intensity),
+                          child: Text(
+                            sighting.intensity.toString(),
+                            style: const TextStyle(
+                              color: Colors.white,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 12),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                '${sighting.intensityDescription} Aurora',
+                                style: const TextStyle(
+                                  color: Colors.white,
+                                  fontSize: 18,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                              Text(
+                                '${sighting.locationName} • ${sighting.timeAgo}',
+                                style: const TextStyle(color: Colors.white70),
+                              ),
+                            ],
+                          ),
                         ),
                       ],
                     ),
-                  );
-                },
+                    const SizedBox(height: 16),
+
+                    // Photos
+                    if (sighting.photoUrls.isNotEmpty)
+                      SizedBox(
+                        height: 200,
+                        child: PageView.builder(
+                          itemCount: sighting.photoUrls.length,
+                          itemBuilder: (context, index) {
+                            return Image.network(
+                              sighting.photoUrls[index],
+                              fit: BoxFit.cover,
+                            );
+                          },
+                        ),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Description
+                    if (sighting.description != null && sighting.description!.isNotEmpty)
+                      Text(
+                        sighting.description!,
+                        style: const TextStyle(color: Colors.white),
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Weather conditions
+                    if (sighting.weather.isNotEmpty)
+                      Row(
+                        children: [
+                          const Icon(Icons.thermostat, color: Colors.tealAccent, size: 16),
+                          const SizedBox(width: 8),
+                          Text(
+                            'BzH: ${sighting.weather['bzH']?.toStringAsFixed(1) ?? 'N/A'} nT • Kp: ${sighting.weather['kp']?.toStringAsFixed(1) ?? 'N/A'}',
+                            style: const TextStyle(color: Colors.white70, fontSize: 12),
+                          ),
+                        ],
+                      ),
+
+                    const SizedBox(height: 16),
+
+                    // Action buttons
+                    Row(
+                      children: [
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: () async {
+                              await _firebaseService.confirmAuroraSighting(sighting.id);
+                              _loadSightings();
+                              if (mounted) Navigator.pop(context);
+                            },
+                            icon: Icon(
+                              sighting.confirmedByUsers.contains(_firebaseService.currentUser?.uid)
+                                  ? Icons.favorite
+                                  : Icons.favorite_border,
+                              color: sighting.confirmedByUsers.contains(_firebaseService.currentUser?.uid)
+                                  ? Colors.red
+                                  : Colors.white70,
+                            ),
+                            label: Text(
+                              '${sighting.confirmations}',
+                              style: TextStyle(
+                                color: sighting.confirmedByUsers.contains(_firebaseService.currentUser?.uid)
+                                    ? Colors.red
+                                    : Colors.white70,
+                              ),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: () {
+                              // Handle comment action
+                            },
+                            icon: const Icon(Icons.comment_outlined, color: Colors.white70),
+                            label: const Text(
+                              'Comment',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ),
+                        ),
+                        Expanded(
+                          child: TextButton.icon(
+                            onPressed: () {
+                              // Handle share action
+                            },
+                            icon: const Icon(Icons.share_outlined, color: Colors.white70),
+                            label: const Text(
+                              'Share',
+                              style: TextStyle(color: Colors.white70),
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ],
+                ),
               ),
             ),
           ),
+        );
+      },
+    );
+  }
+
+  Widget _buildProfileView() {
+    final user = _firebaseService.currentUser;
+    if (user == null) {
+      return const Center(
+        child: SignInWidget(),
+      );
+    }
+
+    return FutureBuilder<DocumentSnapshot>(
+      future: _firebaseService.firestore.collection('users').doc(user.uid).get(),
+      builder: (context, snapshot) {
+        if (snapshot.connectionState == ConnectionState.waiting) {
+          return const Center(child: CircularProgressIndicator());
+        }
+
+        if (!snapshot.hasData || !snapshot.data!.exists) {
+          return const Center(child: Text('Profile not found'));
+        }
+
+        final userData = snapshot.data!.data() as Map<String, dynamic>;
+        final profilePictureUrl = userData['profilePictureUrl'] as String?;
+        final bannerUrl = userData['bannerUrl'] as String?;
+        final bio = userData['bio'] as String? ?? 'No bio yet';
+        final auroraSpottingCount = userData['auroraSpottingCount'] as int? ?? 0;
+        final verificationCount = userData['verificationCount'] as int? ?? 0;
+
+        return SingleChildScrollView(
+          child: Column(
+            children: [
+              // Banner Image
+              Container(
+                height: 200,
+                width: double.infinity,
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topCenter,
+                    end: Alignment.bottomCenter,
+                    colors: [
+                      Colors.tealAccent.withOpacity(0.3),
+                      Colors.transparent,
+                    ],
+                  ),
+                  image: bannerUrl != null
+                      ? DecorationImage(
+                          image: NetworkImage(bannerUrl),
+                          fit: BoxFit.cover,
+                        )
+                      : null,
+                ),
+              ),
+
+              // Profile Picture and Name
+              Transform.translate(
+                offset: const Offset(0, -50),
+                child: Center(
+                  child: Column(
+                    children: [
+                      CircleAvatar(
+                        radius: 50,
+                        backgroundImage: profilePictureUrl != null
+                            ? NetworkImage(profilePictureUrl)
+                            : null,
+                        child: profilePictureUrl == null
+                            ? Text(
+                                user.displayName?[0].toUpperCase() ?? 'U',
+                                style: const TextStyle(fontSize: 32),
+                              )
+                            : null,
+                      ),
+                      const SizedBox(height: 16),
+                      Text(
+                        user.displayName ?? 'Anonymous',
+                        style: const TextStyle(
+                          fontSize: 24,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+
+              // Stats
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Row(
+                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                  children: [
+                    _buildStatColumn('Sightings', auroraSpottingCount),
+                    _buildStatColumn('Verifications', verificationCount),
+                  ],
+                ),
+              ),
+
+              // Bio
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    const Text(
+                      'About',
+                      style: TextStyle(
+                        fontSize: 18,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(bio),
+                  ],
+                ),
+              ),
+
+              // Edit Profile Button
+              Padding(
+                padding: const EdgeInsets.all(16),
+                child: ElevatedButton.icon(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const EditProfileScreen(),
+                      ),
+                    ).then((_) => setState(() {})); // Refresh profile after editing
+                  },
+                  icon: const Icon(Icons.edit),
+                  label: const Text('Edit Profile'),
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.tealAccent,
+                    foregroundColor: Colors.black,
+                  ),
+                ),
+              ),
+
+              // User's Aurora Photos
+              const Padding(
+                padding: EdgeInsets.all(16),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'My Aurora Photos',
+                    style: TextStyle(
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+              ),
+              StreamBuilder<QuerySnapshot>(
+                stream: _firebaseService.getUserPhotoStream(),
+                builder: (context, snapshot) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
+                    return const Center(child: CircularProgressIndicator());
+                  }
+
+                  if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+                    return const Center(
+                      child: Padding(
+                        padding: EdgeInsets.all(16),
+                        child: Text('No photos yet'),
+                      ),
+                    );
+                  }
+
+                  return GridView.builder(
+                    shrinkWrap: true,
+                    physics: const NeverScrollableScrollPhysics(),
+                    padding: const EdgeInsets.all(16),
+                    gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                      crossAxisCount: 3,
+                      crossAxisSpacing: 8,
+                      mainAxisSpacing: 8,
+                    ),
+                    itemCount: snapshot.data!.docs.length,
+                    itemBuilder: (context, index) {
+                      final photo = snapshot.data!.docs[index].data() as Map<String, dynamic>;
+                      return Image.network(
+                        photo['photoUrl'] as String,
+                        fit: BoxFit.cover,
+                      );
+                    },
+                  );
+                },
+              ),
+            ],
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildStatColumn(String label, int count) {
+    return Column(
+      children: [
+        Text(
+          count.toString(),
+          style: const TextStyle(
+            fontSize: 24,
+            fontWeight: FontWeight.bold,
+          ),
         ),
-      ),
+        Text(
+          label,
+          style: const TextStyle(
+            color: Colors.white70,
+          ),
+        ),
+      ],
     );
-  }
-
-  Widget _buildDetailRow(String label, String value, IconData icon) {
-    return Padding(
-      padding: const EdgeInsets.only(bottom: 16),
-      child: Row(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Icon(icon, color: Colors.tealAccent, size: 20),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  label,
-                  style: const TextStyle(
-                    color: Colors.tealAccent,
-                    fontSize: 14,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 4),
-                Text(
-                  value,
-                  style: const TextStyle(
-                    color: Colors.white70,
-                    fontSize: 14,
-                    height: 1.3,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
-    );
-  }
-
-  void _openCameraAtLocation(GeoPoint location) {
-    print('Opening camera at location: ${location.latitude}, ${location.longitude}');
-  }
-
-  Future<void> _confirmSighting(AuroraSighting sighting) async {
-    try {
-      await _firebaseService.verifyAuroraSighting(sighting.id);
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          const SnackBar(
-            content: Text('Thanks for confirming the sighting!'),
-            backgroundColor: Colors.tealAccent,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    } catch (e) {
-      if (mounted) {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('Failed to confirm: ${e.toString()}'),
-            backgroundColor: Colors.red,
-            behavior: SnackBarBehavior.floating,
-          ),
-        );
-      }
-    }
-  }
-
-  Color _getActivityColor(String activityLevel) {
-    switch (activityLevel.toLowerCase()) {
-      case 'exceptional activity':
-        return Colors.amber;
-      case 'high activity':
-        return Colors.orange;
-      case 'moderate activity':
-        return Colors.tealAccent;
-      case 'low activity':
-      case 'minimal activity':
-        return Colors.blue;
-      default:
-        return Colors.grey;
-    }
   }
 
   Color _getIntensityColor(int intensity) {
@@ -1212,5 +899,18 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
         ),
       ),
     );
+  }
+
+  void _updateSightingInList(List<AuroraSighting> list, String sightingId, Map<String, dynamic> result) {
+    final index = list.indexWhere((s) => s.id == sightingId);
+    if (index != -1) {
+      list[index] = list[index].copyWith(
+        confirmations: result['confirmations'],
+        confirmedByUsers: result['isLiked'] 
+          ? [...list[index].confirmedByUsers, _firebaseService.currentUser!.uid]
+          : list[index].confirmedByUsers.where((id) => id != _firebaseService.currentUser!.uid).toList(),
+        isVerified: result['confirmations'] >= 3,
+      );
+    }
   }
 }
