@@ -234,189 +234,48 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
             ),
 
             // User's Aurora Photos
-            const Padding(
-              padding: EdgeInsets.all(16),
-              child: Align(
-                alignment: Alignment.centerLeft,
-                child: Text(
-                  'My Aurora Photos',
-                  style: TextStyle(
-                    fontSize: 18,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-              ),
-            ),
-            StreamBuilder<QuerySnapshot>(
-              stream: _firebaseService.getUserPhotoStream(userId: widget.userId),
-              builder: (context, snapshot) {
-                if (snapshot.connectionState == ConnectionState.waiting) {
-                  return const Center(child: CircularProgressIndicator());
-                }
-
-                if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
-                  return const Center(
-                    child: Padding(
-                      padding: EdgeInsets.all(16),
-                      child: Text('No photos yet'),
-                    ),
-                  );
-                }
-
-                final photos = snapshot.data!.docs
-                    .map((doc) => UserAuroraPhoto.fromFirestore(doc))
-                    .toList();
-
-                return GridView.builder(
-                  shrinkWrap: true,
-                  physics: const NeverScrollableScrollPhysics(),
-                  padding: const EdgeInsets.all(16),
-                  gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                    crossAxisCount: 2,
-                    crossAxisSpacing: 12,
-                    mainAxisSpacing: 12,
-                    childAspectRatio: 0.8,
-                  ),
-                  itemCount: photos.length,
-                  itemBuilder: (context, index) {
-                    final photo = photos[index];
-                    return GestureDetector(
-                      onTap: () {
-                        showModalBottomSheet(
-                          context: context,
-                          isScrollControlled: true,
-                          backgroundColor: Colors.transparent,
-                          builder: (context) => DraggableScrollableSheet(
-                            initialChildSize: 0.95,
-                            minChildSize: 0.7,
-                            maxChildSize: 0.95,
-                            expand: false,
-                            builder: (context, scrollController) => AuroraPhotoViewer(
-                              photo: photo,
-                            ),
-                          ),
-                        );
-                      },
-                      child: Container(
-                        decoration: BoxDecoration(
-                          borderRadius: BorderRadius.circular(12),
-                          border: Border.all(color: Colors.tealAccent.withOpacity(0.2)),
-                          boxShadow: [
-                            BoxShadow(
-                              color: Colors.black.withOpacity(0.3),
-                              blurRadius: 8,
-                              offset: const Offset(0, 4),
-                            ),
-                          ],
-                        ),
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(12),
-                          child: Stack(
-                            children: [
-                              Positioned.fill(
-                                child: Image.network(
-                                  photo.photoUrl,
-                                  fit: BoxFit.cover,
-                                  loadingBuilder: (context, child, loadingProgress) {
-                                    if (loadingProgress == null) return child;
-                                    return Container(
-                                      color: Colors.grey.withOpacity(0.2),
-                                      child: const Center(
-                                        child: CircularProgressIndicator(color: Colors.tealAccent, strokeWidth: 2),
-                                      ),
-                                    );
-                                  },
-                                  errorBuilder: (context, error, stackTrace) {
-                                    return Container(
-                                      color: Colors.grey.withOpacity(0.2),
-                                      child: const Center(
-                                        child: Icon(Icons.broken_image, color: Colors.white54, size: 32),
-                                      ),
-                                    );
-                                  },
-                                ),
-                              ),
-                              Positioned.fill(
-                                child: Container(
-                                  decoration: BoxDecoration(
-                                    gradient: LinearGradient(
-                                      begin: Alignment.topCenter,
-                                      end: Alignment.bottomCenter,
-                                      colors: [Colors.transparent, Colors.black.withOpacity(0.7)],
-                                    ),
-                                  ),
-                                ),
-                              ),
-                              // Likes and comments overlay
-                              Positioned(
-                                bottom: 8,
-                                left: 8,
-                                right: 8,
-                                child: Row(
-                                  mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                  children: [
-                                    Row(
-                                      children: [
-                                        Icon(Icons.favorite, color: Colors.redAccent, size: 16),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${photo.confirmations}',
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                                        ),
-                                        const SizedBox(width: 12),
-                                        Icon(Icons.comment, color: Colors.tealAccent, size: 16),
-                                        const SizedBox(width: 4),
-                                        Text(
-                                          '${photo.commentCount}',
-                                          style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
-                                        ),
-                                      ],
-                                    ),
-                                    Container(
-                                      padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
-                                        color: Colors.tealAccent.withOpacity(0.8),
-                                        borderRadius: BorderRadius.circular(10),
-                                      ),
-                                      child: Text(
-                                        '${photo.intensity}⭐',
-                                        style: const TextStyle(color: Colors.black, fontSize: 10, fontWeight: FontWeight.bold),
-                                      ),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                              // Location and date overlay
-                              Positioned(
-                                top: 8,
-                                left: 8,
-                                right: 8,
-                                child: Column(
-                                  crossAxisAlignment: CrossAxisAlignment.start,
-                                  mainAxisSize: MainAxisSize.min,
-                                  children: [
-                                    Text(
-                                      photo.locationName,
-                                      style: const TextStyle(color: Colors.white, fontSize: 12, fontWeight: FontWeight.bold, shadows: [Shadow(color: Colors.black, blurRadius: 4)]),
-                                      maxLines: 1,
-                                      overflow: TextOverflow.ellipsis,
-                                    ),
-                                    Text(
-                                      photo.formattedDate,
-                                      style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10, shadows: [const Shadow(color: Colors.black, blurRadius: 4)]),
-                                    ),
-                                  ],
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                );
-              },
-            ),
+            // const Padding(
+            //   padding: EdgeInsets.all(16),
+            //   child: Align(
+            //     alignment: Alignment.centerLeft,
+            //     child: Text(
+            //       'My Aurora Photos',
+            //       style: TextStyle(
+            //         fontSize: 18,
+            //         fontWeight: FontWeight.bold,
+            //       ),
+            //     ),
+            //   ),
+            // ),
+            // StreamBuilder<QuerySnapshot>(
+            //   stream: _firebaseService.getUserPhotoStream(userId: widget.userId),
+            //   builder: (context, snapshot) {
+            //     if (snapshot.connectionState == ConnectionState.waiting) {
+            //       return const Center(child: CircularProgressIndicator());
+            //     }
+            //     if (snapshot.hasError) {
+            //       return Center(child: Text('Error: ${snapshot.error}'));
+            //     }
+            //     if (!snapshot.hasData || snapshot.data!.docs.isEmpty) {
+            //       return const Center(child: Text('No photos yet'));
+            //     }
+            //     return GridView.builder(
+            //       shrinkWrap: true,
+            //       physics: const NeverScrollableScrollPhysics(),
+            //       gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+            //         crossAxisCount: 3,
+            //         crossAxisSpacing: 4,
+            //         mainAxisSpacing: 4,
+            //       ),
+            //       itemCount: snapshot.data!.docs.length,
+            //       itemBuilder: (context, index) {
+            //         final doc = snapshot.data!.docs[index];
+            //         final photo = UserAuroraPhoto.fromFirestore(doc);
+            //         return _buildUserPhotoCard(photo);
+            //       },
+            //     );
+            //   },
+            // ),
           ],
         ),
       ),
