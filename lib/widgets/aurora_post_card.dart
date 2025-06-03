@@ -169,19 +169,41 @@ Shared via Aurora Viking App
           _buildHeader(),
 
           // Photos
-          if (widget.sighting.photoUrls.isNotEmpty)
-            SizedBox(
-              height: 300,
-              child: PageView.builder(
-                itemCount: widget.sighting.photoUrls.length,
-                itemBuilder: (context, index) {
-                  return Image.network(
-                    widget.sighting.photoUrls[index],
-                    fit: BoxFit.cover,
-                  );
-                },
+          widget.sighting.photoUrls.isNotEmpty
+            ? SizedBox(
+                height: 300,
+                child: PageView.builder(
+                  itemCount: widget.sighting.photoUrls.length,
+                  itemBuilder: (context, index) {
+                    return Image.network(
+                      widget.sighting.photoUrls[index],
+                      fit: BoxFit.cover,
+                    );
+                  },
+                ),
+              )
+            : Container(
+                height: 100,
+                margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                decoration: BoxDecoration(
+                  color: Colors.tealAccent.withOpacity(0.1),
+                  borderRadius: BorderRadius.circular(12),
+                  border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                ),
+                child: Center(
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      const Icon(Icons.location_on, color: Colors.tealAccent),
+                      const SizedBox(width: 8),
+                      const Text(
+                        'Location-only post',
+                        style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
+                      ),
+                    ],
+                  ),
+                ),
               ),
-            ),
 
           // Description
           if (widget.sighting.description != null && widget.sighting.description!.isNotEmpty)
@@ -199,15 +221,30 @@ Shared via Aurora Viking App
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Row(
                 children: [
-                  const Icon(Icons.thermostat, color: Colors.tealAccent, size: 16),
+                  const Icon(Icons.cloud, color: Colors.white70),
                   const SizedBox(width: 8),
                   Text(
                     'BzH: ${widget.sighting.weather['bzH']?.toStringAsFixed(1) ?? 'N/A'} nT • Kp: ${widget.sighting.weather['kp']?.toStringAsFixed(1) ?? 'N/A'}',
-                    style: const TextStyle(color: Colors.white70, fontSize: 12),
+                    style: const TextStyle(color: Colors.white70),
                   ),
                 ],
               ),
             ),
+
+          // Location info
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                const Icon(Icons.location_on, color: Colors.white70),
+                const SizedBox(width: 8),
+                Text(
+                  '${widget.sighting.locationName} (${widget.sighting.location.latitude.toStringAsFixed(2)}, ${widget.sighting.location.longitude.toStringAsFixed(2)})',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
 
           const SizedBox(height: 8),
 

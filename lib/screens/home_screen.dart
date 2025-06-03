@@ -267,7 +267,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   builder: (context) => AlertDialog(
                     title: const Text('Aurora Viking – Where the Lights Come Alive'),
                     content: const Text(
-                      'Aurora Viking is your trusted guide to the Northern Lights. Whether you\'re chasing the aurora from afar or standing beneath them in Iceland, our app gives you the tools to witness nature\'s most stunning light show.\n\n'
+                      'Aurora Viking is your trusted guide to the Northern Lights. Whether you\'re chasing the aurora from afar or standing beneath them, our app gives you the tools to witness nature\'s most stunning light show.\n\n'
                       'Get real-time aurora forecasts, smart alerts, and live community sightings — all in one place. Track the lights, share the moment, and join a growing community of aurora enthusiasts across the globe.\n\n'
                       'As a dedicated Northern Lights tour operator based in Iceland, we don\'t just predict the aurora — we hunt it. Our expert guides take you beyond the clouds and into the heart of the auroral zone, capturing memories that last a lifetime.\n\n'
                       'Curious about joining one of our tours?\n'
