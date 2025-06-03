@@ -3,6 +3,9 @@ import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/firebase_service.dart';
 import 'tour_auth_screen.dart';
+import 'my_photos_tab.dart';
+import 'package:url_launcher/url_launcher.dart';
+import 'package:url_launcher/url_launcher_string.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -264,6 +267,21 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                             _showVerifyTourDialog(context);
                           },
                         ),
+                      if (userType == 'tour_participant')
+                        _buildSettingsItem(
+                          context,
+                          'Tour Photos',
+                          Icons.photo_library,
+                          Colors.tealAccent,
+                          onTap: () {
+                            Navigator.push(
+                              context,
+                              MaterialPageRoute(
+                                builder: (context) => const MyPhotosTab(),
+                              ),
+                            );
+                          },
+                        ),
                       _buildSettingsItem(
                         context,
                         'Sign Out',
@@ -277,6 +295,49 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                         },
                       ),
                     ],
+                  ),
+                ),
+                // Aurora Viking promo card
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 12),
+                  child: Card(
+                    color: Colors.tealAccent.withOpacity(0.12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+                    elevation: 0,
+                    child: Padding(
+                      padding: const EdgeInsets.all(18),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            'Want to join the creators of this app on a Northern Lights tour?\nAre you going to Iceland or would you like to go? ',
+                            style: TextStyle(
+                              color: Colors.tealAccent,
+                              fontWeight: FontWeight.bold,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(height: 10),
+                          SizedBox(
+                            width: double.infinity,
+                            child: ElevatedButton(
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.tealAccent,
+                                foregroundColor: Colors.black,
+                                shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(10)),
+                              ),
+                              onPressed: () async {
+                                final url = Uri.parse('https://auroraviking.com');
+                                if (await canLaunchUrl(url)) {
+                                  await launchUrl(url, mode: LaunchMode.externalApplication);
+                                }
+                              },
+                              child: const Text('Click here to learn more!'),
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ),
                 ),
               ],

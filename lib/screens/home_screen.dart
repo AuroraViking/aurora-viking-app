@@ -9,6 +9,8 @@ import '../services/firebase_service.dart';
 import '../widgets/user_badge.dart';
 import 'tour_auth_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart';
+import 'package:flutter_svg/flutter_svg.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -258,9 +260,44 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           appBar: AppBar(
             backgroundColor: Colors.transparent,
             elevation: 0,
-            title: const Text(
-              'Aurora Viking',
-              style: TextStyle(color: Colors.white),
+            title: GestureDetector(
+              onTap: () {
+                showDialog(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: const Text('Aurora Viking – Where the Lights Come Alive'),
+                    content: const Text(
+                      'Aurora Viking is your trusted guide to the northern skies. Whether you\'re chasing the aurora from afar or standing beneath them in Iceland, our app gives you the tools to witness nature\'s most stunning light show.\n\n'
+                      'Get real-time aurora forecasts, smart alerts, and live community sightings — all in one place. Track the lights, share the moment, and join a growing community of aurora enthusiasts across the globe.\n\n'
+                      'As a dedicated Northern Lights tour operator based in Iceland, we don\'t just predict the aurora — we hunt it. Our expert guides take you beyond the clouds and into the heart of the auroral zone, capturing memories that last a lifetime.\n\n'
+                      'Curious about joining one of our tours?\n'
+                      'Tap the link to learn more: '
+                    ),
+                    actions: [
+                      TextButton(
+                        onPressed: () async {
+                          final Uri url = Uri.parse('https://auroraviking.com');
+                          if (await canLaunchUrl(url)) {
+                            await launchUrl(url);
+                          } else {
+                            throw 'Could not launch $url';
+                          }
+                        },
+                        child: const Text('auroraviking.com'),
+                      ),
+                      TextButton(
+                        onPressed: () => Navigator.of(context).pop(),
+                        child: const Text('Close'),
+                      ),
+                    ],
+                  ),
+                );
+              },
+              child: Image.asset(
+                'assets/images/WhiteonTransparent.png',
+                height: 36,
+                fit: BoxFit.contain,
+              ),
             ),
             actions: const [
               Padding(

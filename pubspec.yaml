@@ -71,6 +71,7 @@ dependencies:
   # PDF & Printing
   printing: ^5.13.2
   pdf: ^3.11.1
+  flutter_svg: ^2.1.0
 
 dev_dependencies:
   flutter_test:
