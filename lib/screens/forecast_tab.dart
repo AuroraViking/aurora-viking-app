@@ -13,6 +13,7 @@ import '../services/sunrise_sunset_service.dart';
 import '../widgets/forecast/bortle_map.dart';
 import '../services/moon_service.dart';
 import '../widgets/forecast/cloud_forecast_map.dart';
+import '../services/auroral_power_service.dart';
 
 class ForecastTab extends StatefulWidget {
   const ForecastTab({super.key});
@@ -49,12 +50,18 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
   Map<String, dynamic>? _moonData;
   String? _error;
 
+  // Auroral power tracker state
+  final AuroralPowerService _auroralPowerService = AuroralPowerService();
+  Map<String, dynamic>? _auroralPowerStatus;
+  bool _isLoadingAuroralPower = true;
+
   @override
   void initState() {
     super.initState();
     _tabController = TabController(length: 3, vsync: this);
     _loadData();
     _loadCloudCoverData();
+    _loadAuroralPowerStatus();
   }
 
   @override
@@ -136,6 +143,35 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
         _error = e.toString();
         isLoading = false;
       });
+    }
+  }
+
+  Future<void> _loadAuroralPowerStatus() async {
+    setState(() => _isLoadingAuroralPower = true);
+    try {
+      final status = await _auroralPowerService.getAuroralPowerStatus();
+      setState(() {
+        _auroralPowerStatus = status;
+        _isLoadingAuroralPower = false;
+      });
+    } catch (e) {
+      print('Error loading auroral power status: $e');
+      setState(() => _isLoadingAuroralPower = false);
+    }
+  }
+
+  String _formatTimestamp(DateTime timestamp) {
+    final now = DateTime.now();
+    final difference = now.difference(timestamp);
+
+    if (difference.inMinutes < 1) {
+      return 'Just now';
+    } else if (difference.inMinutes < 60) {
+      return '${difference.inMinutes}m ago';
+    } else if (difference.inHours < 24) {
+      return '${difference.inHours}h ago';
+    } else {
+      return '${difference.inDays}d ago';
     }
   }
 
@@ -236,202 +272,304 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
         physics: const NeverScrollableScrollPhysics(),
         children: [
           // Nowcast Tab
-          SingleChildScrollView(
-            child: Column(
-              children: [
-                const SizedBox(height: 16),
-                // Combined Aurora Status and Advice Box
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      colors: [
-                        messageColor.withOpacity(0.2),
-                        messageColor.withOpacity(0.1),
-                      ],
-                      begin: Alignment.centerLeft,
-                      end: Alignment.centerRight,
-                    ),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(color: messageColor.withOpacity(0.5)),
-                    boxShadow: [
-                      BoxShadow(
-                        color: messageColor.withOpacity(0.3),
-                        blurRadius: 15,
-                        spreadRadius: 1,
+          RefreshIndicator(
+            color: Colors.tealAccent,
+            backgroundColor: Colors.black.withOpacity(0.8),
+            onRefresh: () async {
+              await _loadData();
+              await _loadCloudCoverData();
+              await _loadAuroralPowerStatus();
+            },
+            child: SingleChildScrollView(
+              physics: const AlwaysScrollableScrollPhysics(),
+              child: Column(
+                children: [
+                  const SizedBox(height: 16),
+                  // Combined Aurora Status and Advice Box
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        colors: [
+                          messageColor.withOpacity(0.2),
+                          messageColor.withOpacity(0.1),
+                        ],
+                        begin: Alignment.centerLeft,
+                        end: Alignment.centerRight,
                       ),
-                    ],
-                  ),
-                  child: Column(
-                    children: [
-                      Text(
-                        finalMessage,
-                        style: TextStyle(
-                          color: messageColor,
-                          fontSize: 16,
-                          fontWeight: FontWeight.bold,
-                          shadows: [
-                            Shadow(color: messageColor.withOpacity(0.5), blurRadius: 10),
-                          ],
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(color: messageColor.withOpacity(0.5)),
+                      boxShadow: [
+                        BoxShadow(
+                          color: messageColor.withOpacity(0.3),
+                          blurRadius: 15,
+                          spreadRadius: 1,
                         ),
-                        textAlign: TextAlign.center,
-                      ),
-                      if (!isNoDarkness) ...[
-                        const SizedBox(height: 12),
+                      ],
+                    ),
+                    child: Column(
+                      children: [
                         Text(
-                          auroraAdvice,
+                          finalMessage,
                           style: TextStyle(
-                            color: Colors.white.withOpacity(0.9),
-                            fontSize: 14,
-                            fontStyle: FontStyle.italic,
+                            color: messageColor,
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            shadows: [
+                              Shadow(color: messageColor.withOpacity(0.5), blurRadius: 10),
+                            ],
                           ),
                           textAlign: TextAlign.center,
                         ),
-                      ],
-                    ],
-                  ),
-                ),
-                const SizedBox(height: 16),
-                // Data Box
-                Container(
-                  margin: const EdgeInsets.symmetric(horizontal: 16),
-                  padding: const EdgeInsets.all(16),
-                  decoration: BoxDecoration(
-                    gradient: LinearGradient(
-                      begin: Alignment.topLeft,
-                      end: Alignment.bottomRight,
-                      colors: [
-                        Colors.tealAccent.withOpacity(0.1),
-                        Colors.cyanAccent.withOpacity(0.05),
-                        Colors.black.withOpacity(0.8),
+                        if (!isNoDarkness) ...[
+                          const SizedBox(height: 12),
+                          Text(
+                            auroraAdvice,
+                            style: TextStyle(
+                              color: Colors.white.withOpacity(0.9),
+                              fontSize: 14,
+                              fontStyle: FontStyle.italic,
+                            ),
+                            textAlign: TextAlign.center,
+                          ),
+                        ],
                       ],
                     ),
-                    borderRadius: BorderRadius.circular(16),
-                    border: Border.all(
-                      color: Colors.tealAccent.withOpacity(0.6),
-                      width: 1.5,
-                    ),
-                    boxShadow: [
-                      BoxShadow(
-                        color: Colors.tealAccent.withOpacity(0.2),
-                        blurRadius: 20,
-                        spreadRadius: 2,
-                      ),
-                      BoxShadow(
-                        color: Colors.black.withOpacity(0.5),
-                        blurRadius: 10,
-                        offset: const Offset(0, 4),
-                      ),
-                    ],
                   ),
-                  child: Column(
-                    crossAxisAlignment: CrossAxisAlignment.start,
-                    children: [
-                      Row(
-                        mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                        children: [
-                          Row(
+                  const SizedBox(height: 16),
+                  // Auroral Power Tracker
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: Colors.white.withOpacity(0.05),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(
+                              _auroralPowerStatus?['isActive'] == true 
+                                  ? Icons.flash_on 
+                                  : Icons.flash_off,
+                              color: _auroralPowerStatus?['isActive'] == true 
+                                  ? Colors.amber 
+                                  : Colors.white70,
+                              size: 24,
+                            ),
+                            const SizedBox(width: 8),
+                            const Text(
+                              'Auroral Power Tracker',
+                              style: TextStyle(
+                                color: Colors.white,
+                                fontSize: 18,
+                                fontWeight: FontWeight.bold,
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        if (_isLoadingAuroralPower)
+                          const Center(
+                            child: CircularProgressIndicator(
+                              color: Colors.tealAccent,
+                            ),
+                          )
+                        else if (_auroralPowerStatus == null)
+                          const Text(
+                            'Unable to load auroral power data',
+                            style: TextStyle(color: Colors.white70),
+                          )
+                        else if (_auroralPowerStatus!['error'] != null)
+                          Text(
+                            'Error: ${_auroralPowerStatus!['error']}',
+                            style: const TextStyle(color: Colors.red),
+                          )
+                        else ...[
+                          Text(
+                            _auroralPowerService.getAuroralPowerDescription(
+                              _auroralPowerStatus!['northPower'] as double,
+                            ),
+                            style: TextStyle(
+                              color: _auroralPowerStatus!['isActive'] == true 
+                                  ? Colors.amber 
+                                  : Colors.white70,
+                              fontSize: 16,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                          const SizedBox(height: 8),
+                          Text(
+                            'Northern Hemisphere: ${_auroralPowerStatus!['northPower']} GW',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          Text(
+                            'Southern Hemisphere: ${_auroralPowerStatus!['southPower']} GW',
+                            style: const TextStyle(color: Colors.white70),
+                          ),
+                          Text(
+                            'Last updated: ${_formatTimestamp(_auroralPowerStatus!['observationTime'] as DateTime)}',
+                            style: const TextStyle(color: Colors.white54, fontSize: 12),
+                          ),
+                          const SizedBox(height: 16),
+                          ElevatedButton.icon(
+                            onPressed: _loadAuroralPowerStatus,
+                            icon: const Icon(Icons.refresh),
+                            label: const Text('Refresh'),
+                            style: ElevatedButton.styleFrom(
+                              backgroundColor: Colors.tealAccent.withOpacity(0.1),
+                              foregroundColor: Colors.tealAccent,
+                            ),
+                          ),
+                        ],
+                      ],
+                    ),
+                  ),
+                  const SizedBox(height: 16),
+                  // Data Box
+                  Container(
+                    margin: const EdgeInsets.symmetric(horizontal: 16),
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: [
+                          Colors.tealAccent.withOpacity(0.1),
+                          Colors.cyanAccent.withOpacity(0.05),
+                          Colors.black.withOpacity(0.8),
+                        ],
+                      ),
+                      borderRadius: BorderRadius.circular(16),
+                      border: Border.all(
+                        color: Colors.tealAccent.withOpacity(0.6),
+                        width: 1.5,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.tealAccent.withOpacity(0.2),
+                          blurRadius: 20,
+                          spreadRadius: 2,
+                        ),
+                        BoxShadow(
+                          color: Colors.black.withOpacity(0.5),
+                          blurRadius: 10,
+                          offset: const Offset(0, 4),
+                        ),
+                      ],
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            Row(
+                              children: [
+                                Icon(Icons.speed, color: Colors.tealAccent),
+                                const SizedBox(width: 8),
+                                Text(
+                                  'Current Conditions',
+                                  style: TextStyle(
+                                    color: Colors.tealAccent,
+                                    fontSize: 18,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 16),
+                        Row(
+                          children: [
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildDataRow('-BzH', bzH.toStringAsFixed(2), Colors.white, isHighlighted: true, infoType: 'BzH'),
+                                  const SizedBox(height: 8),
+                                  _buildDataRow('Kp Index', kp.toStringAsFixed(1), Colors.white70, infoType: 'Kp'),
+                                  const SizedBox(height: 8),
+                                  _buildDataRow('Bt', '${bt.toStringAsFixed(1)} nT', Colors.white70, infoType: 'Bt'),
+                                  const SizedBox(height: 8),
+                                  _buildDataRow('Bz', '${bzValues.isNotEmpty ? bzValues.last.toStringAsFixed(1) : '0.0'} nT', Colors.white70, infoType: 'Bz'),
+                                ],
+                              ),
+                            ),
+                            Expanded(
+                              child: Column(
+                                crossAxisAlignment: CrossAxisAlignment.start,
+                                children: [
+                                  _buildDataRow('Speed', '${speed.toStringAsFixed(0)} km/s', Colors.white70, infoType: 'Speed'),
+                                  const SizedBox(height: 8),
+                                  _buildDataRow('Density', '${density.toStringAsFixed(1)} p/cm³', Colors.white70, infoType: 'Density'),
+                                ],
+                              ),
+                            ),
+                          ],
+                        ),
+                        const SizedBox(height: 12),
+                        Container(
+                          padding: const EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.tealAccent.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(
+                              color: Colors.tealAccent.withOpacity(0.3),
+                            ),
+                          ),
+                          child: Row(
                             children: [
-                              Icon(Icons.speed, color: Colors.tealAccent),
+                              Icon(Icons.satellite_alt, color: Colors.tealAccent, size: 16),
                               const SizedBox(width: 8),
-                              Text(
-                                'Current Conditions',
-                                style: TextStyle(
-                                  color: Colors.tealAccent,
-                                  fontSize: 18,
-                                  fontWeight: FontWeight.bold,
+                              Expanded(
+                                child: Text(
+                                  'Data from DSCOVR satellite at L1 point (1.5 million km from Earth)',
+                                  style: TextStyle(
+                                    color: Colors.tealAccent,
+                                    fontSize: 12,
+                                    fontStyle: FontStyle.italic,
+                                  ),
                                 ),
                               ),
                             ],
                           ),
-                        ],
-                      ),
-                      const SizedBox(height: 16),
-                      Row(
-                        children: [
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildDataRow('-BzH', bzH.toStringAsFixed(2), Colors.white, isHighlighted: true, infoType: 'BzH'),
-                                const SizedBox(height: 8),
-                                _buildDataRow('Kp Index', kp.toStringAsFixed(1), Colors.white70, infoType: 'Kp'),
-                                const SizedBox(height: 8),
-                                _buildDataRow('Bt', '${bt.toStringAsFixed(1)} nT', Colors.white70, infoType: 'Bt'),
-                                const SizedBox(height: 8),
-                                _buildDataRow('Bz', '${bzValues.isNotEmpty ? bzValues.last.toStringAsFixed(1) : '0.0'} nT', Colors.white70, infoType: 'Bz'),
-                              ],
-                            ),
-                          ),
-                          Expanded(
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                _buildDataRow('Speed', '${speed.toStringAsFixed(0)} km/s', Colors.white70, infoType: 'Speed'),
-                                const SizedBox(height: 8),
-                                _buildDataRow('Density', '${density.toStringAsFixed(1)} p/cm³', Colors.white70, infoType: 'Density'),
-                              ],
-                            ),
-                          ),
-                        ],
-                      ),
-                      const SizedBox(height: 12),
-                      Container(
-                        padding: const EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.tealAccent.withOpacity(0.1),
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(
-                            color: Colors.tealAccent.withOpacity(0.3),
-                          ),
                         ),
-                        child: Row(
-                          children: [
-                            Icon(Icons.satellite_alt, color: Colors.tealAccent, size: 16),
-                            const SizedBox(width: 8),
-                            Expanded(
-                              child: Text(
-                                'Data from DSCOVR satellite at L1 point (1.5 million km from Earth)',
-                                style: TextStyle(
-                                  color: Colors.tealAccent,
-                                  fontSize: 12,
-                                  fontStyle: FontStyle.italic,
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ],
+                      ],
+                    ),
                   ),
-                ),
-                const SizedBox(height: 16),
-                // Chart with fixed height
-                SizedBox(
-                  height: 500,
-                  child: ForecastChartWidget(
-                    bzValues: bzValues,
-                    times: times,
-                    kp: kp,
-                    speed: speed,
-                    density: density,
-                    bt: bt,
-                    btValues: btValues,
+                  const SizedBox(height: 16),
+                  // Chart with fixed height
+                  SizedBox(
+                    height: 500,
+                    child: ForecastChartWidget(
+                      bzValues: bzValues,
+                      times: times,
+                      kp: kp,
+                      speed: speed,
+                      density: density,
+                      bt: bt,
+                      btValues: btValues,
+                    ),
                   ),
-                ),
-                const SizedBox(height: 20),
-                // Satellite Map
-                if (_cloudCoverData != null)
-                  CloudCoverMap(
-                    position: _currentPosition!,
-                    cloudCover: (_cloudCoverData!['cloudCover'] ?? 0).toDouble(),
-                    weatherDescription: _weatherData?['description'] ?? 'N/A',
-                    weatherIcon: _weatherData?['icon'] ?? 'N/A',
-                    isNowcast: true,
-                  ),
-                const SizedBox(height: 20),
-              ],
+                  const SizedBox(height: 20),
+                  // Satellite Map
+                  if (_cloudCoverData != null)
+                    CloudCoverMap(
+                      position: _currentPosition!,
+                      cloudCover: (_cloudCoverData!['cloudCover'] ?? 0).toDouble(),
+                      weatherDescription: _weatherData?['description'] ?? 'N/A',
+                      weatherIcon: _weatherData?['icon'] ?? 'N/A',
+                      isNowcast: true,
+                    ),
+                  const SizedBox(height: 20),
+                ],
+              ),
             ),
           ),
           // Aurora Forecast Tab
