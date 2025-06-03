@@ -2,7 +2,7 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 class AuroraSighting {
-  final String id;
+  String id;
   final String userId;
   final String userName;
   final DateTime timestamp;
@@ -179,6 +179,24 @@ class AuroraSighting {
   @override
   String toString() {
     return 'AuroraSighting(id: $id, user: $userName, intensity: $intensity, location: $locationName, time: $timeAgo)';
+  }
+
+  Map<String, dynamic> toMap() {
+    return {
+      'userId': userId,
+      'userName': userName,
+      'location': location,
+      'locationName': locationName,
+      'timestamp': timestamp,
+      'photoUrls': photoUrls,
+      'description': description,
+      'weather': weather,
+      'intensity': intensity,
+      'confirmations': confirmations,
+      'confirmedByUsers': confirmedByUsers,
+      'isVerified': isVerified,
+      'commentCount': commentCount,
+    };
   }
 }
 

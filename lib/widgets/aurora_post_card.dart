@@ -231,6 +231,21 @@ Shared via Aurora Viking App
               ),
             ),
 
+          // Intensity rating
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16),
+            child: Row(
+              children: [
+                const Icon(Icons.star, color: Colors.amber),
+                const SizedBox(width: 8),
+                Text(
+                  'Intensity: ${widget.sighting.intensity}',
+                  style: const TextStyle(color: Colors.white70),
+                ),
+              ],
+            ),
+          ),
+
           // Location info
           Padding(
             padding: const EdgeInsets.symmetric(horizontal: 16),

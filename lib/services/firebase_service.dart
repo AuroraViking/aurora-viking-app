@@ -1002,4 +1002,13 @@ class FirebaseService {
     final snapshot = await uploadTask;
     return await snapshot.ref.getDownloadURL();
   }
+
+  Future<void> addAuroraSighting(AuroraSighting sighting) async {
+    try {
+      final docRef = await firestore.collection('aurora_sightings').add(sighting.toMap());
+      sighting.id = docRef.id;
+    } catch (e) {
+      throw Exception('Failed to add aurora sighting: $e');
+    }
+  }
 }
