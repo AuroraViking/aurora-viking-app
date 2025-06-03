@@ -7,11 +7,13 @@ import 'camera_aurora_screen.dart';
 class SpotAuroraScreen extends StatefulWidget {
   final double currentBzH;
   final double currentKp;
+  final bool photoRequired;
 
   const SpotAuroraScreen({
     super.key,
     required this.currentBzH,
     required this.currentKp,
+    this.photoRequired = true,
   });
 
   @override
@@ -112,6 +114,15 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
                   icon: Icons.upload_file,
                   label: 'Upload Photo',
                   onTap: _uploadImage,
+                ),
+                const SizedBox(width: 24),
+                _buildOptionButton(
+                  icon: Icons.location_on,
+                  label: 'Just Location',
+                  onTap: () {
+                    // TODO: Implement location sharing logic
+                    Navigator.of(context).pop();
+                  },
                 ),
               ],
             ),

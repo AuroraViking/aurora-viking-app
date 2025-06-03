@@ -156,9 +156,13 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
           ],
         ),
         actions: [
-          IconButton(
-            icon: const Icon(Icons.add_a_photo),
-            onPressed: _navigateToSpotAurora,
+          Padding(
+            padding: const EdgeInsets.only(right: 16),
+            child: FloatingActionButton.extended(
+              onPressed: _navigateToSpotAurora,
+              icon: const Icon(Icons.add_a_photo),
+              label: const Text('Add Sighting'),
+            ),
           ),
         ],
       ),
@@ -697,13 +701,14 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
     }
   }
 
-  void _navigateToSpotAurora() {
+  void _navigateToSpotAurora({bool photoRequired = true}) {
     Navigator.push(
       context,
       MaterialPageRoute(
-        builder: (context) => const SpotAuroraScreen(
+        builder: (context) => SpotAuroraScreen(
           currentBzH: 0.0, // You should get this from your aurora data service
           currentKp: 0.0,  // You should get this from your aurora data service
+          photoRequired: photoRequired,
         ),
       ),
     );
