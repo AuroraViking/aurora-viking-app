@@ -1,8 +1,16 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:http/http.dart' as http;
+import '../widgets/forecast/auroral_power_chart.dart';
 
 class AuroralPowerService {
   final String auroralPowerUrl = 'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json';
+  final List<AuroraPowerPoint> _historicalData = [];
+  static const int maxDataPoints = 24; // Store last 24 data points
+  
+  // Add StreamController for data updates
+  final _dataController = StreamController<List<AuroraPowerPoint>>.broadcast();
+  Stream<List<AuroraPowerPoint>> get dataStream => _dataController.stream;
 
   Future<Map<String, dynamic>> getAuroralPowerStatus() async {
     try {
@@ -42,6 +50,17 @@ class AuroralPowerService {
           final observationTime = DateTime.parse(data['Observation Time']);
           final forecastTime = DateTime.parse(data['Forecast Time']);
 
+          // Add to historical data
+          _historicalData.add(AuroraPowerPoint(observationTime, northPower));
+          
+          // Keep only the last maxDataPoints
+          if (_historicalData.length > maxDataPoints) {
+            _historicalData.removeAt(0);
+          }
+
+          // Notify listeners of the updated data
+          _dataController.add(_historicalData);
+
           print('Northern Hemisphere Power: $northPower GW');
           print('Southern Hemisphere Power: $southPower GW');
           print('Observation Time: $observationTime');
@@ -53,6 +72,7 @@ class AuroralPowerService {
             'southPower': southPower,
             'observationTime': observationTime,
             'forecastTime': forecastTime,
+            'historicalData': _historicalData,
             'error': null,
           };
         } catch (e) {
@@ -76,6 +96,7 @@ class AuroralPowerService {
       'southPower': 0.0,
       'observationTime': DateTime.now(),
       'forecastTime': DateTime.now(),
+      'historicalData': _historicalData,
       'error': error,
     };
   }
@@ -92,5 +113,9 @@ class AuroralPowerService {
     } else {
       return 'No significant auroral activity';
     }
+  }
+
+  void dispose() {
+    _dataController.close();
   }
 } 

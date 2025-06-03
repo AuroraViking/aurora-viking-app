@@ -14,6 +14,7 @@ import '../widgets/forecast/bortle_map.dart';
 import '../services/moon_service.dart';
 import '../widgets/forecast/cloud_forecast_map.dart';
 import '../services/auroral_power_service.dart';
+import '../widgets/forecast/auroral_power_chart.dart';
 
 class ForecastTab extends StatefulWidget {
   const ForecastTab({super.key});
@@ -416,15 +417,14 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                             style: const TextStyle(color: Colors.white54, fontSize: 12),
                           ),
                           const SizedBox(height: 16),
-                          ElevatedButton.icon(
-                            onPressed: _loadAuroralPowerStatus,
-                            icon: const Icon(Icons.refresh),
-                            label: const Text('Refresh'),
-                            style: ElevatedButton.styleFrom(
-                              backgroundColor: Colors.tealAccent.withOpacity(0.1),
-                              foregroundColor: Colors.tealAccent,
+                          if (_auroralPowerStatus!['historicalData'] != null)
+                            SizedBox(
+                              height: 200,
+                              child: AuroraPowerChart(
+                                data: (_auroralPowerStatus!['historicalData'] as List<AuroraPowerPoint>),
+                                service: _auroralPowerService,
+                              ),
                             ),
-                          ),
                         ],
                       ],
                     ),
