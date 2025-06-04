@@ -15,156 +15,227 @@ class AuroraPowerChart extends StatefulWidget {
   final AuroralPowerService service;
 
   const AuroraPowerChart({
-    super.key, 
+    Key? key,
     required this.data,
     required this.service,
-  });
+  }) : super(key: key);
 
   @override
   State<AuroraPowerChart> createState() => _AuroraPowerChartState();
 }
 
-class _AuroraPowerChartState extends State<AuroraPowerChart> with SingleTickerProviderStateMixin {
-  late AnimationController _controller;
-  late Animation<double> _pulse;
-  List<AuroraPowerPoint> _currentData = [];
+class _AuroraPowerChartState extends State<AuroraPowerChart> {
+  List<AuroraPowerPoint> _data = [];
+  bool _isLoading = true;
 
   @override
   void initState() {
     super.initState();
-    _currentData = widget.data;
-    _controller = AnimationController(vsync: this, duration: const Duration(seconds: 2))..repeat(reverse: true);
-    _pulse = Tween<double>(begin: 0.4, end: 0.9).animate(CurvedAnimation(parent: _controller, curve: Curves.easeInOut));
-    
-    // Listen to data updates
-    widget.service.dataStream.listen((newData) {
-      if (mounted) {
-        setState(() {
-          _currentData = newData;
-        });
+    print('🎨 Chart initState: initial data length = ${widget.data.length}');
+    _data = widget.data;
+    _isLoading = widget.data.isEmpty;
+
+    // Listen for updates
+    widget.service.auroralPowerStream.listen((newData) {
+      print('🎨 Chart received stream data with keys: ${newData.keys}');
+      if (mounted && newData.containsKey('historicalData')) {
+        final historicalData = newData['historicalData'];
+        if (historicalData is List<AuroraPowerPoint>) {
+          print('🎨 Updating chart with ${historicalData.length} data points');
+          setState(() {
+            _data = historicalData;
+            _isLoading = false;
+          });
+        } else {
+          print('❌ Historical data is wrong type: ${historicalData.runtimeType}');
+        }
       }
     });
   }
 
   @override
-  void dispose() {
-    _controller.dispose();
-    super.dispose();
-  }
-
-  @override
   Widget build(BuildContext context) {
-    if (_currentData.isEmpty) return const Center(child: Text("No data"));
+    print('🎨 Chart build: isLoading=$_isLoading, data.length=${_data.length}');
 
-    final minTime = _currentData.first.time.millisecondsSinceEpoch.toDouble();
-    final maxTime = _currentData.last.time.millisecondsSinceEpoch.toDouble();
-    final maxPower = _currentData.map((e) => e.power).reduce(max);
-    final isSubstorm = maxPower > 100;
+    if (_isLoading) {
+      print('📊 Chart showing loading because: isLoading=$_isLoading');
+      return const Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            CircularProgressIndicator(
+              color: Colors.tealAccent,
+            ),
+            SizedBox(height: 16),
+            Text(
+              'Loading auroral power data...',
+              style: TextStyle(color: Colors.white70),
+            ),
+          ],
+        ),
+      );
+    }
 
-    // Calculate time interval, ensuring it's not zero
-    final timeRange = maxTime - minTime;
-    final timeInterval = timeRange > 0 ? (timeRange / 4).toDouble() : 3600000.0; // Default to 1 hour if all points are at same time
-
-    return AnimatedBuilder(
-      animation: _pulse,
-      builder: (context, child) {
-        return Container(
-          decoration: BoxDecoration(
-            boxShadow: [
-              if (isSubstorm)
-                BoxShadow(
-                  color: Colors.cyanAccent.withOpacity(_pulse.value),
-                  blurRadius: 40,
-                  spreadRadius: 5,
-                ),
-            ],
+    if (_data.isEmpty) {
+      return Container(
+        height: 300,
+        padding: const EdgeInsets.all(16),
+        child: const Center(
+          child: Text(
+            'Waiting for auroral power data...',
+            style: TextStyle(color: Colors.white70),
           ),
-          child: LineChart(
-            LineChartData(
-              minY: 0,
-              maxY: max(120, maxPower + 10),
-              minX: minTime,
-              maxX: maxTime,
-              titlesData: FlTitlesData(
-                leftTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 60,
-                    interval: 20,
-                    getTitlesWidget: (value, _) => Padding(
-                      padding: const EdgeInsets.only(right: 8),
-                      child: Text(
-                        '${value.toInt()} GW',
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 12,
-                          fontWeight: FontWeight.w500,
-                        ),
+        ),
+      );
+    }
+
+    print('📊 Chart building actual chart with ${_data.length} data points');
+
+    // Sort data by time (oldest to newest)
+    final sortedData = List<AuroraPowerPoint>.from(_data)
+      ..sort((a, b) => a.time.compareTo(b.time));
+
+    // Calculate Y-axis limits with padding (FIXED TYPE ISSUES)
+    final maxPower = sortedData.map((point) => point.power).reduce((a, b) => a > b ? a : b);
+    final minPower = sortedData.map((point) => point.power).reduce((a, b) => a < b ? a : b);
+    final yMax = maxPower + (maxPower * 0.2); // 20% padding
+    final yMin = (minPower - (minPower * 0.2)).clamp(0.0, double.infinity); // Safe clamp
+
+    print('📊 Chart Y-axis: min=$minPower, max=$maxPower, chart min=$yMin, chart max=$yMax');
+
+    // Calculate grid interval
+    final range = yMax - yMin;
+    final gridInterval = range / 5; // 5 grid lines
+
+    return Container(
+      height: 300,
+      padding: const EdgeInsets.all(16),
+      child: LineChart(
+        LineChartData(
+          gridData: FlGridData(
+            show: true,
+            drawVerticalLine: true,
+            horizontalInterval: gridInterval,
+            verticalInterval: (sortedData.length / 10).ceil().toDouble(),
+            getDrawingHorizontalLine: (value) {
+              return FlLine(
+                color: Colors.white.withOpacity(0.1),
+                strokeWidth: 1,
+              );
+            },
+            getDrawingVerticalLine: (value) {
+              return FlLine(
+                color: Colors.white.withOpacity(0.1),
+                strokeWidth: 1,
+              );
+            },
+          ),
+          titlesData: FlTitlesData(
+            show: true,
+            rightTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            topTitles: const AxisTitles(
+              sideTitles: SideTitles(showTitles: false),
+            ),
+            bottomTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                reservedSize: 30,
+                interval: (sortedData.length / 6).ceil().toDouble(),
+                getTitlesWidget: (value, meta) {
+                  final index = value.toInt();
+                  if (index < 0 || index >= sortedData.length) return const Text('');
+                  final time = sortedData[index].time;
+                  return Padding(
+                    padding: const EdgeInsets.only(top: 8.0),
+                    child: Text(
+                      '${time.hour}:${time.minute.toString().padLeft(2, '0')}',
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 10,
                       ),
                     ),
-                  ),
-                ),
-                bottomTitles: AxisTitles(
-                  sideTitles: SideTitles(
-                    showTitles: true,
-                    reservedSize: 32,
-                    interval: timeInterval,
-                    getTitlesWidget: (value, _) {
-                      final time = DateTime.fromMillisecondsSinceEpoch(value.toInt());
-                      return Padding(
-                        padding: const EdgeInsets.only(top: 8),
-                        child: Text(
-                          '${time.hour.toString().padLeft(2, '0')}:${time.minute.toString().padLeft(2, '0')}',
-                          style: const TextStyle(color: Colors.white54, fontSize: 12),
-                        ),
-                      );
-                    },
-                  ),
-                ),
-                rightTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
-                topTitles: AxisTitles(sideTitles: SideTitles(showTitles: false)),
+                  );
+                },
               ),
-              gridData: FlGridData(
-                show: true,
-                drawVerticalLine: true,
-                horizontalInterval: 20,
-                getDrawingHorizontalLine: (_) => FlLine(color: Colors.white10, strokeWidth: 1),
-                getDrawingVerticalLine: (_) => FlLine(color: Colors.white10, strokeWidth: 1),
-              ),
-              borderData: FlBorderData(
-                show: true,
-                border: Border.all(color: Colors.cyanAccent.withOpacity(0.5), width: 1.5),
-              ),
-              backgroundColor: const Color(0xFF0A0D1C),
-              lineBarsData: [
-                LineChartBarData(
-                  isCurved: true,
-                  barWidth: 4,
-                  color: Colors.cyanAccent.withOpacity(_pulse.value),
-                  dotData: FlDotData(show: false),
-                  belowBarData: BarAreaData(
-                    show: true,
-                    gradient: LinearGradient(
-                      colors: [
-                        Colors.cyan.withOpacity(0.3),
-                        Colors.transparent,
-                      ],
-                      begin: Alignment.topCenter,
-                      end: Alignment.bottomCenter,
+            ),
+            leftTitles: AxisTitles(
+              sideTitles: SideTitles(
+                showTitles: true,
+                interval: gridInterval,
+                getTitlesWidget: (value, meta) {
+                  return Text(
+                    value.toStringAsFixed(0),
+                    style: const TextStyle(
+                      color: Colors.white70,
+                      fontSize: 10,
                     ),
-                  ),
-                  spots: _currentData.map((p) {
-                    return FlSpot(
-                      p.time.millisecondsSinceEpoch.toDouble(),
-                      p.power,
-                    );
-                  }).toList(),
-                ),
-              ],
+                  );
+                },
+                reservedSize: 40,
+              ),
             ),
           ),
-        );
-      },
+          borderData: FlBorderData(
+            show: true,
+            border: Border.all(color: Colors.white.withOpacity(0.2)),
+          ),
+          minX: 0,
+          maxX: (sortedData.length - 1).toDouble(),
+          minY: yMin,
+          maxY: yMax,
+          lineBarsData: [
+            LineChartBarData(
+              spots: sortedData.asMap().entries.map((entry) {
+                return FlSpot(entry.key.toDouble(), entry.value.power);
+              }).toList(),
+              isCurved: true,
+              gradient: LinearGradient(
+                colors: [
+                  Colors.cyan.withOpacity(0.5),
+                  Colors.cyan,
+                ],
+              ),
+              barWidth: 3,
+              isStrokeCapRound: true,
+              dotData: const FlDotData(show: false),
+              belowBarData: BarAreaData(
+                show: true,
+                gradient: LinearGradient(
+                  begin: Alignment.topCenter,
+                  end: Alignment.bottomCenter,
+                  colors: [
+                    Colors.cyan.withOpacity(0.3),
+                    Colors.cyan.withOpacity(0.0),
+                  ],
+                ),
+              ),
+            ),
+          ],
+          lineTouchData: LineTouchData(
+            touchTooltipData: LineTouchTooltipData(
+              tooltipRoundedRadius: 8,
+              tooltipPadding: const EdgeInsets.all(8),
+              tooltipMargin: 8,
+              getTooltipItems: (List<LineBarSpot> touchedBarSpots) {
+                return touchedBarSpots.map((barSpot) {
+                  final index = barSpot.x.toInt();
+                  if (index < 0 || index >= sortedData.length) return null;
+                  final data = sortedData[index];
+                  return LineTooltipItem(
+                    '${data.power.toStringAsFixed(2)} GW\n${data.time.hour}:${data.time.minute.toString().padLeft(2, '0')}',
+                    const TextStyle(
+                      color: Colors.white,
+                      fontSize: 12,
+                    ),
+                  );
+                }).whereType<LineTooltipItem>().toList();
+              },
+            ),
+          ),
+        ),
+      ),
     );
   }
-} 
+}

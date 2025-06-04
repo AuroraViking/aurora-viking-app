@@ -8,9 +8,18 @@ import 'spot_aurora_screen.dart';
 import '../services/firebase_service.dart';
 import '../widgets/user_badge.dart';
 import 'tour_auth_screen.dart';
-import 'package:firebase_auth/firebase_auth.dart';
+import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
 import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:geolocator/geolocator.dart';
+import '../services/weather_service.dart';
+import '../services/light_pollution_service.dart';
+import '../services/sunrise_sunset_service.dart';
+import '../services/moon_service.dart';
+import '../widgets/forecast/bortle_map.dart';
+import '../widgets/forecast/cloud_forecast_map.dart';
+import '../services/auroral_power_service.dart';
+import '../widgets/forecast/auroral_power_chart.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -250,7 +259,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       );
     }
 
-    return StreamBuilder<User?>(
+    return StreamBuilder<firebase_auth.User?>(
       stream: _firebaseService.auth.authStateChanges(),
       builder: (context, snapshot) {
         final isAuthenticated = snapshot.hasData;
@@ -267,11 +276,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                   builder: (context) => AlertDialog(
                     title: const Text('Aurora Viking – Where the Lights Come Alive'),
                     content: const Text(
-                      'Aurora Viking is your trusted guide to the Northern Lights. Whether you\'re chasing the aurora from afar or standing beneath them, our app gives you the tools to witness nature\'s most stunning light show.\n\n'
-                      'Get real-time aurora forecasts, smart alerts, and live community sightings — all in one place. Track the lights, share the moment, and join a growing community of aurora enthusiasts across the globe.\n\n'
-                      'As a dedicated Northern Lights tour operator based in Iceland, we don\'t just predict the aurora — we hunt it. Our expert guides take you beyond the clouds and into the heart of the auroral zone, capturing memories that last a lifetime.\n\n'
-                      'Curious about joining one of our tours?\n'
-                      'Tap the link to learn more: '
+                        'Aurora Viking is your trusted guide to the Northern Lights. Whether you\'re chasing the aurora from afar or standing beneath them, our app gives you the tools to witness nature\'s most stunning light show.\n\n'
+                            'Get real-time aurora forecasts, smart alerts, and live community sightings — all in one place. Track the lights, share the moment, and join a growing community of aurora enthusiasts across the globe.\n\n'
+                            'As a dedicated Northern Lights tour operator based in Iceland, we don\'t just predict the aurora — we hunt it. Our expert guides take you beyond the clouds and into the heart of the auroral zone, capturing memories that last a lifetime.\n\n'
+                            'Curious about joining one of our tours?\n'
+                            'Tap the link to learn more: '
                     ),
                     actions: [
                       TextButton(
@@ -299,8 +308,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 fit: BoxFit.contain,
               ),
             ),
-            actions: const [
-              Padding(
+            actions: [
+              const Padding(
                 padding: EdgeInsets.only(right: 16),
                 child: UserBadge(),
               ),
@@ -308,82 +317,87 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
           ),
           body: !isAuthenticated
               ? Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      const Icon(
-                        Icons.account_circle,
-                        size: 64,
-                        color: Colors.blueAccent,
-                      ),
-                      const SizedBox(height: 16),
-                      const Text(
-                        'Welcome to Aurora Viking',
-                        style: TextStyle(
-                          color: Colors.white,
-                          fontSize: 24,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      const Text(
-                        'Please sign in to continue',
-                        style: TextStyle(
-                          color: Colors.white70,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(height: 24),
-                      ElevatedButton(
-                        onPressed: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const TourAuthScreen(),
-                            ),
-                          );
-                        },
-                        style: ElevatedButton.styleFrom(
-                          backgroundColor: Colors.blueAccent,
-                          foregroundColor: Colors.white,
-                          padding: const EdgeInsets.symmetric(
-                            horizontal: 32,
-                            vertical: 16,
-                          ),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(12),
-                          ),
-                        ),
-                        child: const Text(
-                          'Sign In',
-                          style: TextStyle(
-                            fontSize: 16,
-                            fontWeight: FontWeight.bold,
-                          ),
-                        ),
-                      ),
-                    ],
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const Icon(
+                  Icons.account_circle,
+                  size: 64,
+                  color: Colors.blueAccent,
+                ),
+                const SizedBox(height: 16),
+                const Text(
+                  'Welcome to Aurora Viking',
+                  style: TextStyle(
+                    color: Colors.white,
+                    fontSize: 24,
+                    fontWeight: FontWeight.bold,
                   ),
-                )
-              : AnimatedBuilder(
-                  animation: _navigationAnimationController,
-                  builder: (context, child) {
-                    return FadeTransition(
-                      opacity: _navigationAnimationController,
-                      child: SlideTransition(
-                        position: Tween<Offset>(
-                          begin: const Offset(0.0, 0.1),
-                          end: Offset.zero,
-                        ).animate(CurvedAnimation(
-                          parent: _navigationAnimationController,
-                          curve: Curves.easeOutCubic,
-                        )),
-                        child: _buildBody(),
+                ),
+                const SizedBox(height: 8),
+                const Text(
+                  'Please sign in to continue',
+                  style: TextStyle(
+                    color: Colors.white70,
+                    fontSize: 16,
+                  ),
+                ),
+                const SizedBox(height: 24),
+                ElevatedButton(
+                  onPressed: () {
+                    Navigator.push(
+                      context,
+                      MaterialPageRoute(
+                        builder: (context) => const TourAuthScreen(),
                       ),
                     );
                   },
+                  style: ElevatedButton.styleFrom(
+                    backgroundColor: Colors.blueAccent,
+                    foregroundColor: Colors.white,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 32,
+                      vertical: 16,
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                  ),
+                  child: const Text(
+                    'Sign In',
+                    style: TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
                 ),
+              ],
+            ),
+          )
+              : AnimatedBuilder(
+            animation: _navigationAnimationController,
+            builder: (context, child) {
+              return FadeTransition(
+                opacity: _navigationAnimationController,
+                child: SlideTransition(
+                  position: Tween<Offset>(
+                    begin: const Offset(0.0, 0.1),
+                    end: Offset.zero,
+                  ).animate(CurvedAnimation(
+                    parent: _navigationAnimationController,
+                    curve: Curves.easeOutCubic,
+                  )),
+                  child: _buildBody(),
+                ),
+              );
+            },
+          ),
           bottomNavigationBar: isAuthenticated ? _buildNavigationBar() : null,
+          floatingActionButton: FloatingActionButton(
+            onPressed: _refreshData,
+            backgroundColor: Colors.tealAccent,
+            child: const Icon(Icons.refresh),
+          ),
         );
       },
     );
@@ -447,5 +461,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     } else {
       return 'Aurora possible!';
     }
+  }
+
+  Future<void> _refreshData() async {
+    // Implement the logic to refresh data
   }
 }

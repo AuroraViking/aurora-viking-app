@@ -52,7 +52,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
   String? _error;
 
   // Auroral power tracker state
-  final AuroralPowerService _auroralPowerService = AuroralPowerService();
+  late AuroralPowerService _auroralPowerService;
   Map<String, dynamic>? _auroralPowerStatus;
   bool _isLoadingAuroralPower = true;
 
@@ -62,12 +62,20 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
     _tabController = TabController(length: 3, vsync: this);
     _loadData();
     _loadCloudCoverData();
-    _loadAuroralPowerStatus();
+    _auroralPowerService = AuroralPowerService();
+    _auroralPowerService.auroralPowerStream.listen((data) {
+      if (mounted) {
+        setState(() {
+          _auroralPowerStatus = data;
+        });
+      }
+    });
   }
 
   @override
   void dispose() {
     _tabController.dispose();
+    _auroralPowerService.dispose();
     super.dispose();
   }
 
@@ -144,20 +152,6 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
         _error = e.toString();
         isLoading = false;
       });
-    }
-  }
-
-  Future<void> _loadAuroralPowerStatus() async {
-    setState(() => _isLoadingAuroralPower = true);
-    try {
-      final status = await _auroralPowerService.getAuroralPowerStatus();
-      setState(() {
-        _auroralPowerStatus = status;
-        _isLoadingAuroralPower = false;
-      });
-    } catch (e) {
-      print('Error loading auroral power status: $e');
-      setState(() => _isLoadingAuroralPower = false);
     }
   }
 
@@ -279,7 +273,6 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
             onRefresh: () async {
               await _loadData();
               await _loadCloudCoverData();
-              await _loadAuroralPowerStatus();
             },
             child: SingleChildScrollView(
               physics: const AlwaysScrollableScrollPhysics(),
@@ -354,12 +347,8 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                         Row(
                           children: [
                             Icon(
-                              _auroralPowerStatus?['isActive'] == true 
-                                  ? Icons.flash_on 
-                                  : Icons.flash_off,
-                              color: _auroralPowerStatus?['isActive'] == true 
-                                  ? Colors.amber 
-                                  : Colors.white70,
+                              Icons.flash_on,
+                              color: Colors.amber,
                               size: 24,
                             ),
                             const SizedBox(width: 8),
@@ -374,58 +363,50 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                           ],
                         ),
                         const SizedBox(height: 16),
-                        if (_isLoadingAuroralPower)
-                          const Center(
-                            child: CircularProgressIndicator(
-                              color: Colors.tealAccent,
-                            ),
-                          )
-                        else if (_auroralPowerStatus == null)
-                          const Text(
-                            'Unable to load auroral power data',
-                            style: TextStyle(color: Colors.white70),
-                          )
-                        else if (_auroralPowerStatus!['error'] != null)
-                          Text(
-                            'Error: ${_auroralPowerStatus!['error']}',
-                            style: const TextStyle(color: Colors.red),
-                          )
-                        else ...[
-                          Text(
-                            _auroralPowerService.getAuroralPowerDescription(
-                              _auroralPowerStatus!['northPower'] as double,
-                            ),
-                            style: TextStyle(
-                              color: _auroralPowerStatus!['isActive'] == true 
-                                  ? Colors.amber 
-                                  : Colors.white70,
-                              fontSize: 16,
-                              fontWeight: FontWeight.w500,
-                            ),
-                          ),
-                          const SizedBox(height: 8),
-                          Text(
-                            'Northern Hemisphere: ${_auroralPowerStatus!['northPower']} GW',
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                          Text(
-                            'Southern Hemisphere: ${_auroralPowerStatus!['southPower']} GW',
-                            style: const TextStyle(color: Colors.white70),
-                          ),
-                          Text(
-                            'Last updated: ${_formatTimestamp(_auroralPowerStatus!['observationTime'] as DateTime)}',
-                            style: const TextStyle(color: Colors.white54, fontSize: 12),
-                          ),
-                          const SizedBox(height: 16),
-                          if (_auroralPowerStatus!['historicalData'] != null)
-                            SizedBox(
-                              height: 200,
-                              child: AuroraPowerChart(
-                                data: (_auroralPowerStatus!['historicalData'] as List<AuroraPowerPoint>),
-                                service: _auroralPowerService,
-                              ),
-                            ),
-                        ],
+                        
+                        // Simplified status display
+                        StreamBuilder<Map<String, dynamic>>(
+                          stream: _auroralPowerService.auroralPowerStream,
+                          builder: (context, snapshot) {
+                            if (!snapshot.hasData) {
+                              return const Center(
+                                child: CircularProgressIndicator(color: Colors.tealAccent),
+                              );
+                            }
+                            
+                            final data = snapshot.data!;
+                            final currentPower = data['currentPower'] ?? 0.0;
+                            
+                            return Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  _auroralPowerService.getAuroralPowerDescription(currentPower),
+                                  style: TextStyle(
+                                    color: Colors.amber,
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.w500,
+                                  ),
+                                ),
+                                const SizedBox(height: 8),
+                                Text(
+                                  'Current Power: ${currentPower.toStringAsFixed(1)} GW',
+                                  style: const TextStyle(color: Colors.white70),
+                                ),
+                                const SizedBox(height: 16),
+                                
+                                // The chart with proper service connection
+                                SizedBox(
+                                  height: 200,
+                                  child: AuroraPowerChart(
+                                    data: [], // Start with empty data - let the service populate it
+                                    service: _auroralPowerService,
+                                  ),
+                                ),
+                              ],
+                            );
+                          },
+                        ),
                       ],
                     ),
                   ),

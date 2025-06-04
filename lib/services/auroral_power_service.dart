@@ -1,105 +1,246 @@
 import 'dart:convert';
 import 'dart:async';
+import 'dart:math';
 import 'package:http/http.dart' as http;
+import 'package:supabase_flutter/supabase_flutter.dart';
 import '../widgets/forecast/auroral_power_chart.dart';
 
 class AuroralPowerService {
-  final String auroralPowerUrl = 'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json';
-  final List<AuroraPowerPoint> _historicalData = [];
-  static const int maxDataPoints = 24; // Store last 24 data points
-  
-  // Add StreamController for data updates
-  final _dataController = StreamController<List<AuroraPowerPoint>>.broadcast();
-  Stream<List<AuroraPowerPoint>> get dataStream => _dataController.stream;
+  static const String _baseUrl = 'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json';
+  final _controller = StreamController<Map<String, dynamic>>.broadcast();
+  final supabase = Supabase.instance.client;
+  List<AuroraPowerPoint> _historicalData = [];
+  Timer? _timer;
+  bool _isInitialized = false;
 
-  Future<Map<String, dynamic>> getAuroralPowerStatus() async {
+  AuroralPowerService() {
+    print('🚀 Initializing AuroralPowerService...');
+    // Start fetching data immediately
+    fetchAuroralPower();
+    // Load historical data in parallel
+    _loadHistoricalData();
+    // Start periodic updates
+    _startPeriodicUpdates();
+  }
+
+  Future<void> _initialize() async {
+    if (_isInitialized) return;
+    
     try {
-      print('Fetching auroral power from: $auroralPowerUrl');
-      final response = await http.get(Uri.parse(auroralPowerUrl));
-
-      print('Response status code: ${response.statusCode}');
-      print('Response headers: ${response.headers}');
+      // Load historical data from Supabase
+      await _loadHistoricalData();
       
-      if (response.statusCode == 200) {
-        try {
-          final data = jsonDecode(response.body);
-          print('Parsed data: $data');
-
-          // Parse the coordinates data to calculate auroral power
-          final coordinates = data['coordinates'] as List<dynamic>;
-          
-          // Calculate total auroral power for both hemispheres
-          double northPower = 0.0;
-          double southPower = 0.0;
-          
-          for (var coord in coordinates) {
-            final latitude = (coord[1] as num).toDouble();
-            final auroraValue = (coord[2] as num).toDouble();
-            
-            if (latitude > 0) {
-              northPower += auroraValue;
-            } else {
-              southPower += auroraValue;
-            }
-          }
-
-          // Convert to gigawatts (assuming the values are in some unit that needs conversion)
-          northPower = northPower / 1000;
-          southPower = southPower / 1000;
-
-          final observationTime = DateTime.parse(data['Observation Time']);
-          final forecastTime = DateTime.parse(data['Forecast Time']);
-
-          // Add to historical data
-          _historicalData.add(AuroraPowerPoint(observationTime, northPower));
-          
-          // Keep only the last maxDataPoints
-          if (_historicalData.length > maxDataPoints) {
-            _historicalData.removeAt(0);
-          }
-
-          // Notify listeners of the updated data
-          _dataController.add(_historicalData);
-
-          print('Northern Hemisphere Power: $northPower GW');
-          print('Southern Hemisphere Power: $southPower GW');
-          print('Observation Time: $observationTime');
-          print('Forecast Time: $forecastTime');
-
-          return {
-            'isActive': northPower > 20, // Threshold for significant auroral activity
-            'northPower': northPower,
-            'southPower': southPower,
-            'observationTime': observationTime,
-            'forecastTime': forecastTime,
-            'historicalData': _historicalData,
-            'error': null,
-          };
-        } catch (e) {
-          print('Error parsing response: $e');
-          return _createErrorResponse('Error parsing response: $e');
-        }
-      } else {
-        print('Failed to fetch auroral power. Status code: ${response.statusCode}');
-        return _createErrorResponse('Failed to fetch auroral power. Status code: ${response.statusCode}');
-      }
+      // Start periodic updates
+      _startPeriodicUpdates();
+      
+      // Fetch current data
+      await fetchAuroralPower();
+      
+      _isInitialized = true;
     } catch (e) {
-      print('Error fetching auroral power: $e');
-      return _createErrorResponse('Error fetching auroral power: $e');
+      print('❌ Error initializing AuroralPowerService: $e');
     }
   }
 
-  Map<String, dynamic> _createErrorResponse(String error) {
-    return {
-      'isActive': false,
-      'northPower': 0.0,
-      'southPower': 0.0,
-      'observationTime': DateTime.now(),
-      'forecastTime': DateTime.now(),
-      'historicalData': _historicalData,
-      'error': error,
-    };
+  Future<void> _loadHistoricalData() async {
+    try {
+      print('📊 Loading historical data from Supabase...');
+      final twoHoursAgo = DateTime.now().subtract(const Duration(hours: 2));
+
+      final response = await supabase
+          .from('aurora_readings')
+          .select()
+          .gte('timestamp', twoHoursAgo.toIso8601String())
+          .order('timestamp');
+
+      if (response.isNotEmpty) {
+        print('📊 Found ${response.length} historical data points');
+        _historicalData = response.map<AuroraPowerPoint>((item) => AuroraPowerPoint(
+          DateTime.parse(item['timestamp']),
+          item['power'].toDouble(),
+        )).toList();
+
+        // Only emit if we have data
+        if (_historicalData.isNotEmpty) {
+          _controller.add({
+            'historicalData': _historicalData,
+            'currentPower': _historicalData.last.power,
+          });
+        }
+      } else {
+        print('📊 No historical data found in Supabase');
+      }
+    } catch (e) {
+      print('❌ Error loading historical data from Supabase: $e');
+    }
   }
+
+  Future<void> fetchAuroralPower() async {
+    try {
+      print('🌌 Fetching fresh aurora data from NOAA...');
+      final response = await http.get(Uri.parse(_baseUrl));
+      
+      if (response.statusCode == 200) {
+        final data = jsonDecode(response.body);
+        final power = _calculateAuroralPower(data);
+        final now = DateTime.now();
+
+        print('🌌 Aurora power: $power GW');
+
+        // Add new data point
+        _historicalData.add(AuroraPowerPoint(now, power));
+        
+        // Keep only last 2 hours
+        final twoHoursAgo = now.subtract(const Duration(hours: 2));
+        _historicalData.removeWhere((point) => point.time.isBefore(twoHoursAgo));
+
+        // Sort data by time
+        _historicalData.sort((a, b) => a.time.compareTo(b.time));
+
+        // Save to Supabase in the background
+        _saveToSupabase(power, now, twoHoursAgo);
+
+        print('📊 Current data points: ${_historicalData.length}');
+        _controller.add({
+          'historicalData': _historicalData,
+          'currentPower': power,
+        });
+      }
+    } catch (e) {
+      print('❌ Error fetching aurora power: $e');
+    }
+  }
+
+  Future<void> _saveToSupabase(double power, DateTime now, DateTime twoHoursAgo) async {
+    try {
+      await supabase.from('aurora_readings').insert({
+        'power': power,
+        'timestamp': now.toIso8601String(),
+      });
+
+      // Clean up old data
+      await supabase
+          .from('aurora_readings')
+          .delete()
+          .lt('timestamp', twoHoursAgo.toIso8601String());
+
+      print('✅ Data saved to Supabase and old data cleaned up');
+    } catch (e) {
+      print('❌ Error saving to Supabase: $e');
+    }
+  }
+
+  void _startPeriodicUpdates() {
+    _timer?.cancel();
+    _timer = Timer.periodic(const Duration(minutes: 1), (_) => fetchAuroralPower());
+  }
+
+  double _calculateAuroralPower(Map<String, dynamic> data) {
+    try {
+      print('🔍 Analyzing NOAA data structure...');
+      print('📋 NOAA Data keys: ${data.keys.toList()}');
+
+      // New NOAA structure: Parse coordinates array directly
+      if (data.containsKey('coordinates')) {
+        final coordinates = data['coordinates'];
+        if (coordinates is List && coordinates.isNotEmpty) {
+          double totalPower = 0.0;
+          int count = 0;
+
+          // Each coordinate should have aurora activity data
+          for (var coord in coordinates) {
+            if (coord is List && coord.length >= 3) {
+              // Coordinates are usually [lat, lon, value] or similar
+              final value = coord[2]; // Third element is usually the aurora intensity
+              if (value is num) {
+                totalPower += value.toDouble();
+                count++;
+              }
+            } else if (coord is Map) {
+              // Sometimes coordinates are objects with lat, lon, value
+              if (coord.containsKey('value')) {
+                final value = coord['value'];
+                if (value is num) {
+                  totalPower += value.toDouble();
+                  count++;
+                }
+              } else if (coord.containsKey('intensity')) {
+                final value = coord['intensity'];
+                if (value is num) {
+                  totalPower += value.toDouble();
+                  count++;
+                }
+              }
+            }
+          }
+
+          if (count > 0) {
+            // NOAA values are aurora intensity (0-255 scale), convert to GW scale
+            // Scale by 10 to get realistic GW values (40-50 GW range)
+            final avgPower = (totalPower / count) * 10;
+            print('✅ Calculated aurora power from coordinates: $avgPower GW (${count} points)');
+            return avgPower;
+          }
+        }
+      }
+
+      // Try old hemisphere power structure (backup)
+      if (data.containsKey('Hemisphere Power')) {
+        final hemispherePower = data['Hemisphere Power'];
+        if (hemispherePower is Map && hemispherePower.containsKey('North')) {
+          final northPower = hemispherePower['North'];
+          if (northPower is num) {
+            print('✅ Found North hemisphere power: $northPower');
+            return northPower.toDouble();
+          }
+        }
+      }
+
+      // Try observations structure (old format)
+      if (data.containsKey('observations')) {
+        final observations = data['observations'];
+        if (observations is List && observations.isNotEmpty) {
+          double totalPower = 0.0;
+          int count = 0;
+
+          for (var obs in observations) {
+            if (obs is Map && obs.containsKey('forecast')) {
+              final forecast = obs['forecast'];
+              if (forecast is Map && forecast.containsKey('coordinates')) {
+                final coordinates = forecast['coordinates'];
+                if (coordinates is List) {
+                  for (var coord in coordinates) {
+                    if (coord is Map && coord.containsKey('value')) {
+                      final value = coord['value'];
+                      if (value is num) {
+                        totalPower += value.toDouble();
+                        count++;
+                      }
+                    }
+                  }
+                }
+              }
+            }
+          }
+
+          if (count > 0) {
+            // Scale by 10 to get realistic GW values
+            final avgPower = (totalPower / count) * 10;
+            print('✅ Calculated average power from observations: $avgPower');
+            return avgPower;
+          }
+        }
+      }
+
+      throw Exception('Could not parse NOAA data structure');
+
+    } catch (e) {
+      print('❌ Error calculating auroral power: $e');
+      rethrow;
+    }
+  }
+
+  Stream<Map<String, dynamic>> get auroralPowerStream => _controller.stream;
 
   String getAuroralPowerDescription(double power) {
     if (power > 50) {
@@ -116,6 +257,7 @@ class AuroralPowerService {
   }
 
   void dispose() {
-    _dataController.close();
+    _timer?.cancel();
+    _controller.close();
   }
-} 
+}

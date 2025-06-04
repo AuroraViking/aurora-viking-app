@@ -1,6 +1,7 @@
 // lib/main.dart
 import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
+import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/firebase_service.dart';
 import 'screens/home_screen.dart';
 import 'services/config_service.dart';
@@ -11,11 +12,25 @@ void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
   bool firebaseInitialized = false;
+  bool supabaseInitialized = false;
 
   try {
     // Initialize ConfigService first
     await ConfigService.initialize();
     print('ConfigService initialized successfully');
+
+    // Initialize Supabase
+    try {
+      await Supabase.initialize(
+        url: 'https://mbbmukqjjdlhhhrtimuv.supabase.co',
+        anonKey: 'eyJhbGciOiJIUzI1NiIsInR5cCI6IkpXVCJ9.eyJpc3MiOiJzdXBhYmFzZSIsInJlZiI6Im1iYm11a3FqamRsaGhocnRpbXV2Iiwicm9sZSI6ImFub24iLCJpYXQiOjE3NDkwMjkxMDQsImV4cCI6MjA2NDYwNTEwNH0.Q9bwgZU_XmuxZLbrBsa8PbL8x9NYdoNP17U3UcceM8g',
+      );
+      print('Supabase initialized successfully');
+      supabaseInitialized = true;
+    } catch (supabaseError) {
+      print('Error initializing Supabase: $supabaseError');
+      // Continue app execution even if Supabase fails
+    }
 
     // Initialize Firebase with error handling
     try {
@@ -44,13 +59,21 @@ void main() async {
     // You might want to show an error dialog here
   }
 
-  runApp(MyApp(firebaseInitialized: firebaseInitialized));
+  runApp(MyApp(
+    firebaseInitialized: firebaseInitialized,
+    supabaseInitialized: supabaseInitialized,
+  ));
 }
 
 class MyApp extends StatelessWidget {
   final bool firebaseInitialized;
-  
-  const MyApp({super.key, required this.firebaseInitialized});
+  final bool supabaseInitialized;
+
+  const MyApp({
+    super.key,
+    required this.firebaseInitialized,
+    required this.supabaseInitialized,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -61,18 +84,29 @@ class MyApp extends StatelessWidget {
         brightness: Brightness.dark,
         scaffoldBackgroundColor: Colors.black,
       ),
-      home: firebaseInitialized 
-          ? const HomeScreen()
-          : const Scaffold(
-              body: Center(
-                child: Text(
-                  'Unable to initialize app services.\nPlease check your internet connection and try again.',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(color: Colors.white),
-                ),
-              ),
-            ),
+      home: _getHomeScreen(),
       debugShowCheckedModeBanner: false,
     );
+  }
+
+  Widget _getHomeScreen() {
+    if (supabaseInitialized) {
+      // Supabase is working - use it for aurora data
+      return const HomeScreen();
+    } else if (firebaseInitialized) {
+      // Fall back to Firebase if Supabase fails
+      return const HomeScreen();
+    } else {
+      // Both failed
+      return const Scaffold(
+        body: Center(
+          child: Text(
+            'Unable to initialize app services.\nPlease check your internet connection and try again.',
+            textAlign: TextAlign.center,
+            style: TextStyle(color: Colors.white),
+          ),
+        ),
+      );
+    }
   }
 }
