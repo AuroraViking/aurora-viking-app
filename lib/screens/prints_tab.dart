@@ -5,21 +5,21 @@ import '../services/firebase_service.dart';
 import '../models/print_product.dart';
 import '../models/user_aurora_photo.dart';
 
-class PrintShopTab extends StatefulWidget {
+class PrintsTab extends StatefulWidget {
   final UserAuroraPhoto? preSelectedPhoto;
 
-  const PrintShopTab({super.key, this.preSelectedPhoto});
+  const PrintsTab({super.key, this.preSelectedPhoto});
 
   @override
-  State<PrintShopTab> createState() => _PrintShopTabState();
+  State<PrintsTab> createState() => _PrintsTabState();
 }
 
-class _PrintShopTabState extends State<PrintShopTab> with TickerProviderStateMixin {
+class _PrintsTabState extends State<PrintsTab> with TickerProviderStateMixin {
   final PrintfulService _printfulService = PrintfulService();
   final FirebaseService _firebaseService = FirebaseService();
 
   List<PrintProduct> _products = [];
-  List<CartItem> _cartItems = [];
+  final List<CartItem> _cartItems = [];
   bool _isLoading = true;
   String _selectedCategory = 'all';
 
@@ -288,7 +288,7 @@ class _PrintShopTabState extends State<PrintShopTab> with TickerProviderStateMix
             ),
 
             // Category tabs
-            Container(
+            SizedBox(
               height: 50,
               child: TabBar(
                 controller: _tabController,

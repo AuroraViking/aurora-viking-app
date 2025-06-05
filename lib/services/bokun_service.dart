@@ -2,12 +2,15 @@ import 'dart:convert';
 import 'package:http/http.dart' as http;
 import 'package:crypto/crypto.dart';
 import '../models/tour.dart';
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
 
 class BokunService {
   // TODO: Securely fetch or store API keys, do not ship secrets in app code
-  static const String _accessKey = 'ac9b97bc985e438ea1dac47ac46a3f5e';
-  static const String _secretKey = '71224940931d43f996cc41a5c0ee943d';
-  static const String _baseUrl = 'https://api.bokun.io/v1';
+  static String get _accessKey => dotenv.env['BOKUN_ACCESS_KEY'] ?? '';
+  static String get _secretKey => dotenv.env['BOKUN_SECRET_KEY'] ?? '';
+  static String get _baseUrl => dotenv.env['BOKUN_BASE_URL'] ?? 'https://api.bokun.io/v1';
+
 
   // Generate HMAC-SHA1 signature for Bokun API authentication
   static String _generateSignature(String date, String path) {

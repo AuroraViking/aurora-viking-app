@@ -5,11 +5,22 @@ import 'package:supabase_flutter/supabase_flutter.dart';
 import 'services/firebase_service.dart';
 import 'screens/home_screen.dart';
 import 'services/config_service.dart';
-// Add your other imports here
+import 'package:flutter_dotenv/flutter_dotenv.dart';
+
+
+
+
 
 void main() async {
-  // Ensure Flutter binding is initialized
   WidgetsFlutterBinding.ensureInitialized();
+  
+  try {
+    await dotenv.load(fileName: ".env");
+    print('Environment variables loaded successfully');
+  } catch (e) {
+    print('Error loading .env file: $e');
+    // Continue without environment variables
+  }
 
   bool firebaseInitialized = false;
   bool supabaseInitialized = false;

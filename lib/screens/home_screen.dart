@@ -2,7 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'forecast_tab.dart';
 import 'my_photos_tab.dart';
-import 'print_shop_tab.dart';
+import 'prints_tab.dart' as prints;
 import 'aurora_alerts_tab.dart';
 import 'spot_aurora_screen.dart';
 import '../services/firebase_service.dart';
@@ -145,7 +145,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       case 2:
         return const MyPhotosTab();
       case 3:
-        return const PrintShopTab();
+        return const prints.PrintsTab();
       default:
         return const ForecastTab();
     }
@@ -163,7 +163,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _buildNavItem(0, Icons.radar, 'Forecast'),
         _buildNavItem(1, Icons.notifications, 'Aurora Sightings'),
         _buildNavItem(2, Icons.photo_library, 'Photos'),
-        _buildNavItem(3, Icons.shopping_bag, 'Shop'),
+        _buildNavItem(3, Icons.print, 'Prints'),
       ],
     );
   }
@@ -308,8 +308,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 fit: BoxFit.contain,
               ),
             ),
-            actions: [
-              const Padding(
+            actions: const [
+              Padding(
                 padding: EdgeInsets.only(right: 16),
                 child: UserBadge(),
               ),

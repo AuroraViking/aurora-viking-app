@@ -1,13 +1,13 @@
 import 'package:http/http.dart' as http;
 import 'dart:convert';
+import 'config_service.dart';
 
 class WeatherService {
-  static const String _apiKey = 'b7889cba97489be6e2f825f3861feb23';
   static const String _baseUrl = 'https://api.openweathermap.org/data/2.5';
 
   Future<Map<String, dynamic>> getWeatherData(double latitude, double longitude) async {
     final response = await http.get(
-      Uri.parse('$_baseUrl/weather?lat=$latitude&lon=$longitude&appid=$_apiKey&units=metric'),
+      Uri.parse('$_baseUrl/weather?lat=$latitude&lon=$longitude&appid=${ConfigService.weatherApiKey}&units=metric'),
     );
 
     if (response.statusCode == 200) {

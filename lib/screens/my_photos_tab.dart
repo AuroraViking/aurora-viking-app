@@ -6,7 +6,7 @@ import '../services/firebase_service.dart';
 import '../services/user_photos_service.dart';
 import '../models/tour_photo.dart';
 import '../models/user_aurora_photo.dart';
-import '../screens/print_shop_tab.dart' as print_shop;
+import '../screens/prints_tab.dart' as prints;
 import '../widgets/aurora_photo_viewer.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
@@ -278,14 +278,14 @@ class _MyPhotosTabState extends State<MyPhotosTab> {
                   children: [
                     Row(
                       children: [
-                        Icon(Icons.favorite, color: Colors.redAccent, size: 16),
+                        const Icon(Icons.favorite, color: Colors.redAccent, size: 16),
                         const SizedBox(width: 4),
                         Text(
                           '${photo.confirmations}',
                           style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                         ),
                         const SizedBox(width: 12),
-                        Icon(Icons.comment, color: Colors.tealAccent, size: 16),
+                        const Icon(Icons.comment, color: Colors.tealAccent, size: 16),
                         const SizedBox(width: 4),
                         Text(
                           '${photo.commentCount}',
@@ -324,7 +324,7 @@ class _MyPhotosTabState extends State<MyPhotosTab> {
                     ),
                     Text(
                       photo.formattedDate,
-                      style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10, shadows: [const Shadow(color: Colors.black, blurRadius: 4)]),
+                      style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10, shadows: const [Shadow(color: Colors.black, blurRadius: 4)]),
                     ),
                   ],
                 ),

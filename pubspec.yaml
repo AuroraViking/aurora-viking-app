@@ -10,57 +10,59 @@ environment:
 dependencies:
   flutter:
     sdk: flutter
+  flutter_localizations:
+    sdk: flutter
 
   # Core UI & Charts
-  fl_chart: ^0.66.2
+  fl_chart: ^0.69.0
   cupertino_icons: ^1.0.8
 
+  # Environment Variables
+  flutter_dotenv: ^5.1.0
+
   # HTTP & Networking
-  http: ^1.1.0
+  http: ^1.2.1
   dio: ^5.7.0
-  html: ^0.15.4
 
   # Firebase Core Services
-  firebase_core: ^3.6.0
-  firebase_auth: ^5.3.1
-  cloud_firestore: ^5.4.3
-  firebase_storage: ^12.3.2
-  firebase_analytics: ^11.3.3
-  firebase_messaging: ^15.1.3
-
-  supabase_flutter: ^2.3.4
+  firebase_core: ^3.13.1
+  firebase_auth: ^5.5.4
+  cloud_firestore: ^5.6.8
+  firebase_storage: ^12.4.6
+  firebase_analytics: ^11.4.6
+  firebase_messaging: ^15.2.6
 
   # Location & Maps
-  geolocator: ^10.1.0
+  geolocator: ^10.1.1
   geocoding: ^3.0.0
   google_maps_flutter: ^2.5.3
   location: ^7.0.0
 
   # Camera & Media
-  camera: ^0.11.0+2
+  camera: ^0.11.1
   image_picker: ^1.1.2
   image: ^4.2.0
 
   # Permissions
-  permission_handler: ^11.3.1
+  permission_handler: ^11.4.0
 
   # Notifications
   flutter_local_notifications: ^18.0.1
 
   # Storage & Files
-  shared_preferences: ^2.3.2
-  path_provider: ^2.1.4
-  sqflite: ^2.3.3+2
+  shared_preferences: ^2.5.3
+  path_provider: ^2.1.5
+  sqflite: ^2.4.2
 
   # E-commerce & Payments
-  flutter_stripe: ^11.1.0
+  flutter_stripe: ^11.5.0
 
   # Utilities
-  intl: ^0.18.1
+  intl: ^0.19.0
   uuid: ^4.5.1
-  connectivity_plus: ^6.0.5
+  connectivity_plus: ^6.1.4
   device_info_plus: ^10.1.2
-  package_info_plus: ^8.0.2
+  package_info_plus: ^8.3.0
   url_launcher: ^6.3.1
   share_plus: ^11.0.0
 
@@ -72,9 +74,13 @@ dependencies:
   json_annotation: ^4.9.0
 
   # PDF & Printing
-  printing: ^5.13.2
+  printing: ^5.14.2
   pdf: ^3.11.1
   flutter_svg: ^2.1.0
+
+  # Additional dependencies
+  provider: ^6.1.2
+  supabase_flutter: ^2.3.4
 
 dev_dependencies:
   flutter_test:
@@ -85,7 +91,7 @@ dev_dependencies:
 
   # App Icon & Splash
   flutter_launcher_icons: ^0.13.1
-  flutter_native_splash: ^2.4.1
+  flutter_native_splash: ^2.4.6
 
 # App Icon Configuration
 flutter_launcher_icons:
@@ -108,6 +114,7 @@ flutter:
     - assets/images/
     - assets/icons/
     - assets/animations/
+    - .env
 
   # Custom fonts will be added later
   # fonts:
