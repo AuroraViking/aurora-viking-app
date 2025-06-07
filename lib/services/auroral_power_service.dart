@@ -1,263 +1,344 @@
-import 'dart:convert';
 import 'dart:async';
-import 'dart:math';
-import 'package:http/http.dart' as http;
 import 'package:supabase_flutter/supabase_flutter.dart';
-import '../widgets/forecast/auroral_power_chart.dart';
+
+class AuroraPowerPoint {
+  final DateTime time;
+  final double power;
+
+  AuroraPowerPoint(this.time, this.power);
+
+  @override
+  String toString() => 'AuroraPowerPoint(time: $time, power: ${power.toStringAsFixed(1)} GW)';
+}
 
 class AuroralPowerService {
-  static const String _baseUrl = 'https://services.swpc.noaa.gov/json/ovation_aurora_latest.json';
-  final _controller = StreamController<Map<String, dynamic>>.broadcast();
-  final supabase = Supabase.instance.client;
-  List<AuroraPowerPoint> _historicalData = [];
-  Timer? _timer;
+  static const int _maxDataPoints = 48; // 2 hours of candy-fueled data
+  static const Duration _updateInterval = Duration(minutes: 1);
+
+  // Singleton pattern (because sharing candy is caring)
+  static final AuroralPowerService _instance = AuroralPowerService._internal();
+  factory AuroralPowerService() => _instance;
+  AuroralPowerService._internal();
+
+  final SupabaseClient _supabase = Supabase.instance.client;
+  final List<AuroraPowerPoint> _historicalData = [];
+  Timer? _updateTimer;
+
+  // Stream controller for real-time sugar rush updates
+  final StreamController<Map<String, dynamic>> _dataController =
+  StreamController<Map<String, dynamic>>.broadcast();
+
+  Stream<Map<String, dynamic>> get auroralPowerStream => _dataController.stream;
+  List<AuroraPowerPoint> get historicalData => List.unmodifiable(_historicalData);
+
   bool _isInitialized = false;
+  bool _isInitializing = false;
 
-  AuroralPowerService() {
-    print('🚀 Initializing AuroralPowerService...');
-    // Start fetching data immediately
-    fetchAuroralPower();
-    // Load historical data in parallel
-    _loadHistoricalData();
-    // Start periodic updates
-    _startPeriodicUpdates();
-  }
+  /// Initialize the candy-powered aurora service
+  Future<void> initialize() async {
+    if (_isInitialized || _isInitializing) return;
 
-  Future<void> _initialize() async {
-    if (_isInitialized) return;
-    
+    _isInitializing = true;
+    print('🚀 Initializing Candy-Powered AuroralPowerService (Database-Only Mode)...');
+
     try {
-      // Load historical data from Supabase
-      await _loadHistoricalData();
-      
-      // Start periodic updates
+      // Load delicious data from database (maintained by Edge Function)
+      await _loadDataFromDatabase();
+
+      // Start periodic sugar-checking updates
       _startPeriodicUpdates();
-      
-      // Fetch current data
-      await fetchAuroralPower();
-      
+
+      // Set up real-time candy delivery subscription
+      _setupRealtimeSubscription();
+
       _isInitialized = true;
+      print('✅ Candy-Powered AuroralPowerService initialized with ${_historicalData.length} sweet data points');
+
+      // Emit initial candy rush
+      _emitCurrentData();
+
     } catch (e) {
-      print('❌ Error initializing AuroralPowerService: $e');
+      print('❌ Service initialization failed (probably ran out of candy): $e');
+      _isInitializing = false;
+      rethrow;
     }
+
+    _isInitializing = false;
   }
 
-  Future<void> _loadHistoricalData() async {
+  Future<void> _loadDataFromDatabase() async {
     try {
-      print('📊 Loading historical data from Supabase...');
-      final twoHoursAgo = DateTime.now().subtract(const Duration(hours: 2));
+      print('📋 Loading aurora candy from database...');
 
-      final response = await supabase
+      final response = await _supabase
           .from('aurora_readings')
-          .select()
-          .gte('timestamp', twoHoursAgo.toIso8601String())
-          .order('timestamp');
+          .select('timestamp, power, source')
+          .order('timestamp', ascending: true)
+          .limit(_maxDataPoints);
 
-      if (response.isNotEmpty) {
-        print('📊 Found ${response.length} historical data points');
-        _historicalData = response.map<AuroraPowerPoint>((item) => AuroraPowerPoint(
-          DateTime.parse(item['timestamp']),
-          item['power'].toDouble(),
-        )).toList();
+      _historicalData.clear();
 
-        // Only emit if we have data
-        if (_historicalData.isNotEmpty) {
-          _controller.add({
-            'historicalData': _historicalData,
-            'currentPower': _historicalData.last.power,
-          });
-        }
-      } else {
-        print('📊 No historical data found in Supabase');
-      }
-    } catch (e) {
-      print('❌ Error loading historical data from Supabase: $e');
-    }
-  }
-
-  Future<void> fetchAuroralPower() async {
-    try {
-      print('🌌 Fetching fresh aurora data from NOAA...');
-      final response = await http.get(Uri.parse(_baseUrl));
-      
-      if (response.statusCode == 200) {
-        final data = jsonDecode(response.body);
-        final power = _calculateAuroralPower(data);
-        final now = DateTime.now();
-
-        print('🌌 Aurora power: $power GW');
-
-        // Add new data point
-        _historicalData.add(AuroraPowerPoint(now, power));
-        
-        // Keep only last 2 hours
-        final twoHoursAgo = now.subtract(const Duration(hours: 2));
-        _historicalData.removeWhere((point) => point.time.isBefore(twoHoursAgo));
-
-        // Sort data by time
-        _historicalData.sort((a, b) => a.time.compareTo(b.time));
-
-        // Save to Supabase in the background
-        _saveToSupabase(power, now, twoHoursAgo);
-
-        print('📊 Current data points: ${_historicalData.length}');
-        _controller.add({
-          'historicalData': _historicalData,
-          'currentPower': power,
-        });
-      }
-    } catch (e) {
-      print('❌ Error fetching aurora power: $e');
-    }
-  }
-
-  Future<void> _saveToSupabase(double power, DateTime now, DateTime twoHoursAgo) async {
-    try {
-      await supabase.from('aurora_readings').insert({
-        'power': power,
-        'timestamp': now.toIso8601String(),
-      });
-
-      // Clean up old data
-      await supabase
-          .from('aurora_readings')
-          .delete()
-          .lt('timestamp', twoHoursAgo.toIso8601String());
-
-      print('✅ Data saved to Supabase and old data cleaned up');
-    } catch (e) {
-      print('❌ Error saving to Supabase: $e');
-    }
-  }
-
-  void _startPeriodicUpdates() {
-    _timer?.cancel();
-    _timer = Timer.periodic(const Duration(minutes: 1), (_) => fetchAuroralPower());
-  }
-
-  double _calculateAuroralPower(Map<String, dynamic> data) {
-    try {
-      print('🔍 Analyzing NOAA data structure...');
-      print('📋 NOAA Data keys: ${data.keys.toList()}');
-
-      // New NOAA structure: Parse coordinates array directly
-      if (data.containsKey('coordinates')) {
-        final coordinates = data['coordinates'];
-        if (coordinates is List && coordinates.isNotEmpty) {
-          double totalPower = 0.0;
-          int count = 0;
-
-          // Each coordinate should have aurora activity data
-          for (var coord in coordinates) {
-            if (coord is List && coord.length >= 3) {
-              // Coordinates are usually [lat, lon, value] or similar
-              final value = coord[2]; // Third element is usually the aurora intensity
-              if (value is num) {
-                totalPower += value.toDouble();
-                count++;
-              }
-            } else if (coord is Map) {
-              // Sometimes coordinates are objects with lat, lon, value
-              if (coord.containsKey('value')) {
-                final value = coord['value'];
-                if (value is num) {
-                  totalPower += value.toDouble();
-                  count++;
-                }
-              } else if (coord.containsKey('intensity')) {
-                final value = coord['intensity'];
-                if (value is num) {
-                  totalPower += value.toDouble();
-                  count++;
-                }
-              }
-            }
-          }
-
-          if (count > 0) {
-            // NOAA values are aurora intensity (0-255 scale), convert to GW scale
-            // Scale by 10 to get realistic GW values (40-50 GW range)
-            final avgPower = (totalPower / count) * 10;
-            print('✅ Calculated aurora power from coordinates: $avgPower GW (${count} points)');
-            return avgPower;
-          }
+      for (var row in response) {
+        try {
+          final time = DateTime.parse(row['timestamp']).toUtc();
+          final power = double.parse(row['power'].toString());
+          _historicalData.add(AuroraPowerPoint(time, power));
+        } catch (e) {
+          print('⚠️ Error parsing candy-flavored database row: $e');
+          continue;
         }
       }
 
-      // Try old hemisphere power structure (backup)
-      if (data.containsKey('Hemisphere Power')) {
-        final hemispherePower = data['Hemisphere Power'];
-        if (hemispherePower is Map && hemispherePower.containsKey('North')) {
-          final northPower = hemispherePower['North'];
-          if (northPower is num) {
-            print('✅ Found North hemisphere power: $northPower');
-            return northPower.toDouble();
-          }
-        }
+      print('📋 Loaded ${_historicalData.length} delicious data points from database');
+
+      // If no candy data, try to trigger the magical Edge Function
+      if (_historicalData.isEmpty) {
+        print('⚠️ No candy in database. Attempting to summon Edge Function...');
+        await _triggerEdgeFunction();
       }
-
-      // Try observations structure (old format)
-      if (data.containsKey('observations')) {
-        final observations = data['observations'];
-        if (observations is List && observations.isNotEmpty) {
-          double totalPower = 0.0;
-          int count = 0;
-
-          for (var obs in observations) {
-            if (obs is Map && obs.containsKey('forecast')) {
-              final forecast = obs['forecast'];
-              if (forecast is Map && forecast.containsKey('coordinates')) {
-                final coordinates = forecast['coordinates'];
-                if (coordinates is List) {
-                  for (var coord in coordinates) {
-                    if (coord is Map && coord.containsKey('value')) {
-                      final value = coord['value'];
-                      if (value is num) {
-                        totalPower += value.toDouble();
-                        count++;
-                      }
-                    }
-                  }
-                }
-              }
-            }
-          }
-
-          if (count > 0) {
-            // Scale by 10 to get realistic GW values
-            final avgPower = (totalPower / count) * 10;
-            print('✅ Calculated average power from observations: $avgPower');
-            return avgPower;
-          }
-        }
-      }
-
-      throw Exception('Could not parse NOAA data structure');
 
     } catch (e) {
-      print('❌ Error calculating auroral power: $e');
+      print('❌ Error loading candy data from database: $e');
       rethrow;
     }
   }
 
-  Stream<Map<String, dynamic>> get auroralPowerStream => _controller.stream;
+  Future<void> _triggerEdgeFunction() async {
+    try {
+      print('🔄 Triggering Edge Function to collect initial candy...');
 
-  String getAuroralPowerDescription(double power) {
-    if (power > 50) {
-      return 'Major auroral activity detected!';
-    } else if (power > 30) {
-      return 'Strong auroral activity detected';
-    } else if (power > 20) {
-      return 'Moderate auroral activity detected';
-    } else if (power > 10) {
-      return 'Minor auroral activity detected';
-    } else {
-      return 'No significant auroral activity';
+      final response = await _supabase.functions.invoke(
+        'aurora-collector',
+        headers: {'Content-Type': 'application/json'},
+      );
+
+      if (response.data != null && response.data['success'] == true) {
+        print('✅ Edge Function triggered successfully: ${response.data['aurora_power']} GW of pure candy energy');
+
+        // Wait for the candy to process
+        await Future.delayed(const Duration(seconds: 3));
+        await _loadDataFromDatabase();
+      } else {
+        print('⚠️ Edge Function returned: ${response.data}');
+      }
+
+    } catch (e) {
+      print('⚠️ Could not trigger Edge Function (maybe it needs more candy): $e');
+      // Continue without triggering - data will come from cron job candy delivery
     }
   }
 
+  void _setupRealtimeSubscription() {
+    try {
+      print('🔔 Setting up real-time candy delivery subscription...');
+
+      _supabase
+          .channel('aurora_candy_changes')
+          .onPostgresChanges(
+        event: PostgresChangeEvent.insert,
+        schema: 'public',
+        table: 'aurora_readings',
+        callback: (payload) {
+          print('📡 New candy delivered via real-time subscription');
+          _handleRealtimeUpdate(payload);
+        },
+      )
+          .subscribe();
+
+    } catch (e) {
+      print('⚠️ Could not set up real-time candy subscription: $e');
+      // Continue without real-time - periodic candy checks will still work
+    }
+  }
+
+  void _handleRealtimeUpdate(PostgresChangePayload payload) {
+    try {
+      final newRow = payload.newRecord;
+      if (newRow != null) {
+        final time = DateTime.parse(newRow['timestamp']).toUtc();
+        final power = double.parse(newRow['power'].toString());
+        final newPoint = AuroraPowerPoint(time, power);
+
+        // Add new candy point and maintain sweetness limit
+        _historicalData.add(newPoint);
+        _historicalData.sort((a, b) => a.time.compareTo(b.time));
+
+        // Keep only last 48 points (optimal candy concentration)
+        if (_historicalData.length > _maxDataPoints) {
+          _historicalData.removeAt(0);
+        }
+
+        // Emit updated candy data
+        _emitCurrentData();
+        print('🔄 Real-time candy update: ${power.toStringAsFixed(1)} GW at ${time.toLocal()}');
+      }
+    } catch (e) {
+      print('⚠️ Error handling real-time candy update: $e');
+    }
+  }
+
+  void _startPeriodicUpdates() {
+    _updateTimer?.cancel();
+
+    _updateTimer = Timer.periodic(_updateInterval, (timer) async {
+      if (_isInitialized) {
+        try {
+          await _checkForUpdates();
+        } catch (e) {
+          print('⚠️ Periodic candy check failed: $e');
+        }
+      }
+    });
+
+    print('⏰ Started periodic candy checks every ${_updateInterval.inMinutes} minute(s)');
+  }
+
+  Future<void> _checkForUpdates() async {
+    try {
+      // Get timestamp of our latest candy
+      DateTime? latestTime;
+      if (_historicalData.isNotEmpty) {
+        latestTime = _historicalData.last.time;
+      }
+
+      // Query for any newer candy - simplified approach
+      final response = await _supabase
+          .from('aurora_readings')
+          .select('timestamp, power, source')
+          .order('timestamp', ascending: true)
+          .limit(_maxDataPoints);
+
+      // Filter out old data points if we have existing data
+      List<dynamic> newDataRows = response;
+      if (latestTime != null) {
+        newDataRows = response.where((row) {
+          final rowTime = DateTime.parse(row['timestamp']).toUtc();
+          return rowTime.isAfter(latestTime!);
+        }).toList();
+      }
+
+      if (newDataRows.isNotEmpty) {
+        print('📡 Found ${newDataRows.length} new candy data points');
+
+        for (var row in newDataRows) {
+          try {
+            final time = DateTime.parse(row['timestamp']).toUtc();
+            final power = double.parse(row['power'].toString());
+            _historicalData.add(AuroraPowerPoint(time, power));
+          } catch (e) {
+            print('⚠️ Error parsing new candy data point: $e');
+            continue;
+          }
+        }
+
+        // Sort and trim to optimal candy size limit
+        _historicalData.sort((a, b) => a.time.compareTo(b.time));
+        if (_historicalData.length > _maxDataPoints) {
+          _historicalData.removeRange(0, _historicalData.length - _maxDataPoints);
+        }
+
+        // Emit updated candy data
+        _emitCurrentData();
+      }
+
+    } catch (e) {
+      print('⚠️ Error checking for candy updates: $e');
+    }
+  }
+
+  void _emitCurrentData() {
+    if (_historicalData.isNotEmpty) {
+      _dataController.add({
+        'historicalData': _historicalData,
+        'currentPower': _historicalData.last.power,
+      });
+    }
+  }
+
+  /// Manually refresh candy data from database
+  Future<void> refresh() async {
+    if (!_isInitialized) {
+      await initialize();
+      return;
+    }
+
+    try {
+      await _loadDataFromDatabase();
+      _emitCurrentData();
+      print('🔄 Manual candy refresh completed');
+    } catch (e) {
+      print('❌ Manual candy refresh failed: $e');
+      rethrow;
+    }
+  }
+
+  /// Get current auroral power (latest candy reading)
+  double get currentPower {
+    if (_historicalData.isEmpty) return 0.0;
+    return _historicalData.last.power;
+  }
+
+  /// Get aurora activity description based on candy power level
+  String getAuroralPowerDescription(double power) {
+    if (power > 50) {
+      return 'Major auroral candy explosion detected!';
+    } else if (power > 30) {
+      return 'Strong auroral candy activity detected';
+    } else if (power > 20) {
+      return 'Moderate auroral candy activity detected';
+    } else if (power > 10) {
+      return 'Minor auroral candy activity detected';
+    } else {
+      return 'No significant auroral candy activity';
+    }
+  }
+
+  /// Get candy data coverage information
+  String get dataCoverageInfo {
+    if (_historicalData.isEmpty) return 'No candy available';
+
+    final oldest = _historicalData.first.time;
+    final newest = _historicalData.last.time;
+    final duration = newest.difference(oldest);
+
+    return 'Candy coverage: ${duration.inMinutes} minutes (${_historicalData.length} sweet points)';
+  }
+
+  /// Get candy data freshness information
+  String get dataFreshnessInfo {
+    if (_historicalData.isEmpty) return 'No candy';
+
+    final lastUpdate = _historicalData.last.time;
+    final now = DateTime.now().toUtc();
+    final minutesAgo = now.difference(lastUpdate).inMinutes;
+
+    if (minutesAgo < 2) {
+      return 'Real-time candy';
+    } else if (minutesAgo < 5) {
+      return '$minutesAgo minutes ago (fresh candy)';
+    } else if (minutesAgo < 60) {
+      return '$minutesAgo minutes ago (candy getting stale)';
+    } else {
+      return 'Candy may be expired';
+    }
+  }
+
+  /// Get candy system status
+  String get systemStatus {
+    if (_historicalData.isEmpty) return 'No candy';
+    if (_historicalData.length < 20) return 'Partial candy';
+    if (_historicalData.length >= 40) return 'Healthy candy levels';
+    return 'Limited candy supply';
+  }
+
   void dispose() {
-    _timer?.cancel();
-    _controller.close();
+    _updateTimer?.cancel();
+    _dataController.close();
+    _isInitialized = false;
+
+    // Close real-time candy subscription
+    _supabase.removeAllChannels();
+
+    print('🛑 Candy-Powered AuroralPowerService disposed (all candy consumed)');
   }
 }

@@ -6,8 +6,14 @@ class WeatherService {
   static const String _baseUrl = 'https://api.openweathermap.org/data/2.5';
 
   Future<Map<String, dynamic>> getWeatherData(double latitude, double longitude) async {
+    final apiKey = ConfigService.weatherApiKey;
+    if (apiKey.isEmpty) {
+      final errorMsg = 'OpenWeatherMap API key is missing.';
+      print(errorMsg);
+      return {'error': errorMsg};
+    }
     final response = await http.get(
-      Uri.parse('$_baseUrl/weather?lat=$latitude&lon=$longitude&appid=${ConfigService.weatherApiKey}&units=metric'),
+      Uri.parse('$_baseUrl/weather?lat=$latitude&lon=$longitude&appid=$apiKey&units=metric'),
     );
 
     if (response.statusCode == 200) {
@@ -21,8 +27,9 @@ class WeatherService {
         'weatherIcon': data['weather'][0]['icon'],
       };
     } else {
-      print('Weather API error: ${response.statusCode} ${response.body}');
-      throw Exception('Failed to load weather data');
+      final errorMsg = 'Weather API error: ${response.statusCode} ${response.body}';
+      print(errorMsg);
+      return {'error': errorMsg};
     }
   }
 } 

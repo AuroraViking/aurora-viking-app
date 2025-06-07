@@ -4,6 +4,7 @@ import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import '../models/aurora_sighting.dart';
 import '../services/cloud_tile_provider.dart';
+import '../services/config_service.dart';
 
 class AuroraMap extends StatefulWidget {
   final Position currentLocation;
@@ -111,7 +112,7 @@ class _AuroraMapState extends State<AuroraMap> {
     final TileOverlay cloudOverlay = TileOverlay(
       tileOverlayId: const TileOverlayId('cloud_overlay'),
       tileProvider: CloudTileProvider(
-        urlTemplate: 'https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=b7889cba97489be6e2f825f3861feb23',
+        urlTemplate: 'https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=[36m${ConfigService.weatherApiKey}[0m',
         timeOffset: 0,
       ),
       transparency: 0.05,

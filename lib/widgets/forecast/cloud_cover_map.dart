@@ -6,6 +6,7 @@ import '../../services/cloud_forecast_service.dart';
 import 'package:intl/intl.dart';
 import 'package:flutter/gestures.dart';
 import 'package:flutter/foundation.dart';
+import '../../services/config_service.dart';
 
 class CloudCoverMap extends StatefulWidget {
   final Position position;
@@ -34,7 +35,7 @@ class _CloudCoverMapState extends State<CloudCoverMap> {
   double _timeOffset = 0;
   bool _isDragging = false;
   bool _isLoadingForecast = false;
-  LatLng _currentCenter = LatLng(0, 0);
+  LatLng _currentCenter = const LatLng(0, 0);
 
   @override
   void initState() {
@@ -47,7 +48,7 @@ class _CloudCoverMapState extends State<CloudCoverMap> {
     final TileOverlay cloudOverlay = TileOverlay(
       tileOverlayId: const TileOverlayId('cloud_overlay'),
       tileProvider: CloudTileProvider(
-        urlTemplate: 'https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=b7889cba97489be6e2f825f3861feb23',
+        urlTemplate: 'https://tile.openweathermap.org/map/clouds_new/{z}/{x}/{y}.png?appid=${ConfigService.weatherApiKey}',
         timeOffset: _timeOffset,
       ),
       transparency: 0.0,
@@ -92,7 +93,7 @@ class _CloudCoverMapState extends State<CloudCoverMap> {
           width: 40,
           child: Text(
             DateFormat('EEE\nMMM d').format(time),
-            style: TextStyle(
+            style: const TextStyle(
               color: Colors.white70,
               fontSize: 10,
             ),

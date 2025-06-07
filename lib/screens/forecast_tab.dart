@@ -54,7 +54,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
   // Auroral power tracker state
   late AuroralPowerService _auroralPowerService;
   Map<String, dynamic>? _auroralPowerStatus;
-  bool _isLoadingAuroralPower = true;
+  final bool _isLoadingAuroralPower = true;
 
   @override
   void initState() {
@@ -207,6 +207,45 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
       );
     }
 
+    if (_weatherData != null && _weatherData!.containsKey('error')) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Weather Error: \\${_weatherData!['error']}\\',
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadData,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+    if (_cloudCoverData != null && _cloudCoverData!.containsKey('error')) {
+      return Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            Text(
+              'Cloud Cover Error: \\${_cloudCoverData!['error']}\\',
+              style: const TextStyle(color: Colors.red),
+              textAlign: TextAlign.center,
+            ),
+            const SizedBox(height: 16),
+            ElevatedButton(
+              onPressed: _loadCloudCoverData,
+              child: const Text('Retry'),
+            ),
+          ],
+        ),
+      );
+    }
+
     if (_currentPosition == null || _weatherData == null || _lightPollutionData == null || _sunData == null) {
       return const Center(
         child: Text('No data available'),
@@ -344,15 +383,15 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           children: [
                             Icon(
                               Icons.flash_on,
                               color: Colors.amber,
                               size: 24,
                             ),
-                            const SizedBox(width: 8),
-                            const Text(
+                            SizedBox(width: 8),
+                            Text(
                               'Auroral Power Tracker',
                               style: TextStyle(
                                 color: Colors.white,
@@ -382,7 +421,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                               children: [
                                 Text(
                                   _auroralPowerService.getAuroralPowerDescription(currentPower),
-                                  style: TextStyle(
+                                  style: const TextStyle(
                                     color: Colors.amber,
                                     fontSize: 16,
                                     fontWeight: FontWeight.w500,
@@ -399,7 +438,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                                 SizedBox(
                                   height: 200,
                                   child: AuroraPowerChart(
-                                    data: [], // Start with empty data - let the service populate it
+                                    data: const [], // Start with empty data - let the service populate it
                                     service: _auroralPowerService,
                                   ),
                                 ),
@@ -446,13 +485,13 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
+                        const Row(
                           mainAxisAlignment: MainAxisAlignment.spaceBetween,
                           children: [
                             Row(
                               children: [
                                 Icon(Icons.speed, color: Colors.tealAccent),
-                                const SizedBox(width: 8),
+                                SizedBox(width: 8),
                                 Text(
                                   'Current Conditions',
                                   style: TextStyle(
@@ -504,10 +543,10 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                               color: Colors.tealAccent.withOpacity(0.3),
                             ),
                           ),
-                          child: Row(
+                          child: const Row(
                             children: [
                               Icon(Icons.satellite_alt, color: Colors.tealAccent, size: 16),
-                              const SizedBox(width: 8),
+                              SizedBox(width: 8),
                               Expanded(
                                 child: Text(
                                   'Data from DSCOVR satellite at L1 point (1.5 million km from Earth)',
@@ -596,10 +635,10 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
+                          const Row(
                             children: [
                               Icon(Icons.wb_sunny, color: Colors.orange),
-                              const SizedBox(width: 8),
+                              SizedBox(width: 8),
                               Text(
                                 'Sun & Daylight',
                                 style: TextStyle(
@@ -611,7 +650,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                             ],
                           ),
                           IconButton(
-                            icon: Icon(Icons.help_outline, color: Colors.orange),
+                            icon: const Icon(Icons.help_outline, color: Colors.orange),
                             onPressed: () => _showSunInfoHelp(context),
                           ),
                         ],
@@ -660,10 +699,10 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                       Row(
                         mainAxisAlignment: MainAxisAlignment.spaceBetween,
                         children: [
-                          Row(
+                          const Row(
                             children: [
                               Icon(Icons.nightlight_round, color: Colors.tealAccent),
-                              const SizedBox(width: 8),
+                              SizedBox(width: 8),
                               Text(
                                 'Moon Phase',
                                 style: TextStyle(
@@ -675,7 +714,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                             ],
                           ),
                           IconButton(
-                            icon: Icon(Icons.help_outline, color: Colors.tealAccent),
+                            icon: const Icon(Icons.help_outline, color: Colors.tealAccent),
                             onPressed: () => _showMoonInfoHelp(context),
                           ),
                         ],
@@ -692,10 +731,10 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
                           Icon(Icons.schedule, color: Colors.tealAccent, size: 20),
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           Text(
                             '24-Hour Kp Forecast',
                             style: TextStyle(
@@ -719,10 +758,10 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
+                      const Row(
                         children: [
                           Icon(Icons.calendar_today, color: Colors.tealAccent, size: 20),
-                          const SizedBox(width: 8),
+                          SizedBox(width: 8),
                           Text(
                             '5-Day Kp Forecast',
                             style: TextStyle(
@@ -768,7 +807,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
-        child: Center(
+        child: const Center(
           child: Text(
             'Forecast data unavailable',
             style: TextStyle(color: Colors.white54),
@@ -791,7 +830,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
           borderRadius: BorderRadius.circular(12),
           border: Border.all(color: Colors.white.withOpacity(0.1)),
         ),
-        child: Center(
+        child: const Center(
           child: Text(
             'Forecast data unavailable',
             style: TextStyle(color: Colors.white54),
@@ -837,7 +876,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
               children: [
                 Text(
                   forecast.formattedDate,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white,
                     fontSize: 14,
                     fontWeight: FontWeight.w600,
@@ -846,7 +885,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                 if (isToday)
                   Text(
                     isCurrentHour ? 'Now' : 'Today',
-                    style: TextStyle(
+                    style: const TextStyle(
                       color: Colors.tealAccent,
                       fontSize: 11,
                       fontWeight: FontWeight.bold,
@@ -897,7 +936,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                 ),
                 Text(
                   'Confidence: ${forecast.confidenceLevel}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.white70,
                     fontSize: 11,
                   ),
@@ -969,12 +1008,12 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
           ),
           child: Row(
             children: [
-              Icon(Icons.info_outline, color: Colors.tealAccent, size: 16),
+              const Icon(Icons.info_outline, color: Colors.tealAccent, size: 16),
               const SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Next Phase: ${_moonData?['nextPhase'] ?? 'N/A'} at ${_moonData?['nextPhaseTime'] ?? 'N/A'}',
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.tealAccent,
                     fontSize: 12,
                     fontStyle: FontStyle.italic,
@@ -1070,10 +1109,10 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: Colors.tealAccent.withOpacity(0.5)),
           ),
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.nightlight_round, color: Colors.tealAccent),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 'Moon Phase Guide',
                 style: TextStyle(
@@ -1118,7 +1157,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text(
+              child: const Text(
                 'Close',
                 style: TextStyle(color: Colors.tealAccent),
               ),
@@ -1150,7 +1189,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
               children: [
                 Text(
                   title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.tealAccent,
                     fontWeight: FontWeight.bold,
                   ),
@@ -1303,7 +1342,7 @@ The Bz value is crucial for aurora formation - negative values are required for 
               Expanded(
                 child: Text(
                   title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.tealAccent,
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
@@ -1325,7 +1364,7 @@ The Bz value is crucial for aurora formation - negative values are required for 
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text(
+              child: const Text(
                 'Close',
                 style: TextStyle(color: Colors.tealAccent),
               ),
@@ -1366,10 +1405,10 @@ The Bz value is crucial for aurora formation - negative values are required for 
                 color: Colors.red.withOpacity(0.3),
               ),
             ),
-            child: Row(
+            child: const Row(
               children: [
                 Icon(Icons.warning_amber_rounded, color: Colors.red, size: 16),
-                const SizedBox(width: 8),
+                SizedBox(width: 8),
                 Expanded(
                   child: Text(
                     'It will not be dark enough at your location tonight for aurora spotting',
@@ -1430,10 +1469,10 @@ The Bz value is crucial for aurora formation - negative values are required for 
               color: Colors.orange.withOpacity(0.3),
             ),
           ),
-          child: Row(
+          child: const Row(
             children: [
               Icon(Icons.info_outline, color: Colors.orange, size: 16),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Expanded(
                 child: Text(
                   'Astronomical Twilight: Dark enough to see the aurora',
@@ -1461,10 +1500,10 @@ The Bz value is crucial for aurora formation - negative values are required for 
             borderRadius: BorderRadius.circular(16),
             side: BorderSide(color: Colors.orange.withOpacity(0.5)),
           ),
-          title: Row(
+          title: const Row(
             children: [
               Icon(Icons.wb_sunny, color: Colors.orange),
-              const SizedBox(width: 8),
+              SizedBox(width: 8),
               Text(
                 'Sun & Daylight Guide',
                 style: TextStyle(
@@ -1497,7 +1536,7 @@ The Bz value is crucial for aurora formation - negative values are required for 
           actions: [
             TextButton(
               onPressed: () => Navigator.of(context).pop(),
-              child: Text(
+              child: const Text(
                 'Close',
                 style: TextStyle(color: Colors.orange),
               ),
@@ -1529,7 +1568,7 @@ The Bz value is crucial for aurora formation - negative values are required for 
               children: [
                 Text(
                   title,
-                  style: TextStyle(
+                  style: const TextStyle(
                     color: Colors.orange,
                     fontWeight: FontWeight.bold,
                   ),

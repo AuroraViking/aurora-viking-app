@@ -113,7 +113,6 @@ flutter:
   assets:
     - assets/images/
     - assets/icons/
-    - assets/animations/
     - .env
 
   # Custom fonts will be added later
