@@ -12,6 +12,8 @@ import '../models/aurora_sighting.dart';
 import '../services/solar_wind_service.dart';
 import '../services/kp_service.dart';
 import '../services/aurora_message_service.dart';
+import 'package:image/image.dart' as img;
+import 'dart:typed_data';
 
 class CameraAuroraScreen extends StatefulWidget {
   final double currentBzH;
@@ -274,7 +276,18 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
 
       if (result['success'] == true) {
         final imagePath = result['imagePath'] as String;
-        
+        File originalFile = File(imagePath);
+        // Read image bytes
+        Uint8List imageBytes = await originalFile.readAsBytes();
+        // Decode image
+        img.Image? capturedImg = img.decodeImage(imageBytes);
+        if (capturedImg != null) {
+          // TODO: For more robust orientation fix, use exif package to read orientation metadata.
+          // Fix orientation if needed (rotate left)
+          img.Image fixedImg = img.copyRotate(capturedImg, angle: 90); // 90 degrees right to fix left rotation
+          // Save fixed image back to file
+          await originalFile.writeAsBytes(Uint8List.fromList(img.encodeJpg(fixedImg)));
+        }
         setState(() {
           _isPhotoTaken = true;
           _photoPath = imagePath;
