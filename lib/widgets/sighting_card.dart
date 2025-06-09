@@ -164,13 +164,19 @@ class SightingCard extends StatelessWidget {
                     ),
                     const SizedBox(width: 4),
                     Expanded(
-                      child: Text(
-                        sighting.locationName,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 13,
+                      child: Tooltip(
+                        message: sighting.locationName,
+                        child: Text(
+                          sighting.locationName.length > 24
+                              ? sighting.locationName.substring(0, 24) + '...'
+                              : sighting.locationName,
+                          style: const TextStyle(
+                            color: Colors.white70,
+                            fontSize: 13,
+                          ),
+                          overflow: TextOverflow.ellipsis,
+                          maxLines: 1,
                         ),
-                        overflow: TextOverflow.ellipsis,
                       ),
                     ),
                     if (currentLocation != null) ...[

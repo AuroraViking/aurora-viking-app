@@ -1,21 +1,52 @@
+<!-- android/app/src/main/AndroidManifest.xml -->
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
 
+    <!-- Existing Permissions -->
     <uses-permission android:name="android.permission.INTERNET" />
     <uses-permission android:name="android.permission.ACCESS_FINE_LOCATION" />
     <uses-permission android:name="android.permission.ACCESS_COARSE_LOCATION" />
     <uses-permission android:name="android.permission.CAMERA" />
+    
+    <!-- Additional Camera Permissions for Camera2 API -->
+    <uses-permission android:name="android.permission.WRITE_EXTERNAL_STORAGE" />
+    <uses-permission android:name="android.permission.READ_EXTERNAL_STORAGE" />
+
+    <!-- Enhanced Camera Features for Camera2 API -->
     <uses-feature android:name="android.hardware.camera" android:required="false" />
+    <uses-feature 
+        android:name="android.hardware.camera2.full" 
+        android:required="false" />
+    <uses-feature 
+        android:name="android.hardware.camera.autofocus" 
+        android:required="false" />
+    <uses-feature 
+        android:name="android.hardware.camera.flash" 
+        android:required="false" />
+    
+    <!-- Manual Camera Controls for Aurora Photography -->
+    <uses-feature 
+        android:name="android.hardware.camera.capability.manual_sensor" 
+        android:required="false" />
+    <uses-feature 
+        android:name="android.hardware.camera.capability.manual_post_processing" 
+        android:required="false" />
+    <uses-feature 
+        android:name="android.hardware.camera.capability.raw" 
+        android:required="false" />
 
     <application
         android:label="Aurora Viking"
-        android:icon="@mipmap/ic_launcher">
+        android:icon="@mipmap/ic_launcher"
+        android:requestLegacyExternalStorage="true">
 
         <activity
             android:name="com.example.aurora_viking_app.MainActivity"
             android:exported="true"
             android:launchMode="singleTop"
             android:theme="@style/LaunchTheme"
-            android:windowSoftInputMode="adjustResize">
+            android:windowSoftInputMode="adjustResize"
+            android:configChanges="orientation|keyboardHidden|keyboard|screenSize|smallestScreenSize|locale|layoutDirection|fontScale|screenLayout|density|uiMode"
+            android:hardwareAccelerated="true">
 
             <meta-data
                 android:name="io.flutter.embedding.android.NormalTheme"
@@ -41,5 +72,12 @@
             android:value="@integer/google_play_services_version" />
 
     </application>
+    
+    <!-- Query for camera apps (for backup option) -->
+    <queries>
+        <intent>
+            <action android:name="android.media.action.IMAGE_CAPTURE" />
+        </intent>
+    </queries>
 
 </manifest>

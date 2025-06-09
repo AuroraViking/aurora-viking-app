@@ -1,7 +1,6 @@
 // lib/screens/camera_aurora_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -33,6 +32,9 @@ class CameraAuroraScreen extends StatefulWidget {
 class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     with WidgetsBindingObserver, TickerProviderStateMixin {
 
+  // Native camera method channel
+  static const MethodChannel _cameraChannel = MethodChannel('aurora_camera/native');
+
   // Location variables
   Position? _currentPosition;
   String _locationName = 'Unknown Location';
@@ -53,8 +55,11 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   // UI variables
   bool _showCaptureUI = false;
   bool _showDetailsForm = false;
+  bool _showManualControls = false;
+  bool _nightVisionMode = false;
   late AnimationController _pulseController;
   late AnimationController _slideController;
+  late AnimationController _manualControlsController;
 
   final TextEditingController _descriptionController = TextEditingController();
   final FirebaseService _firebaseService = FirebaseService();
@@ -62,6 +67,31 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   // Camera variables
   bool _isPhotoTaken = false;
   String? _photoPath;
+  bool _isCameraInitialized = false;
+  bool _isCapturing = false;
+
+  // Manual camera control variables
+  double _currentISO = 1600.0;
+  double _currentExposureTime = 5.0; // In seconds for long exposure
+  double _currentFocus = 1.0; // 0.0 = close, 1.0 = infinity
+  int _timerSeconds = 0;
+  bool _isTimerActive = false;
+  Timer? _captureTimer;
+  int _countdownValue = 0;
+
+  // Camera capability ranges (will be set by native camera)
+  double _minISO = 100.0;
+  double _maxISO = 6400.0;
+  double _minExposureTime = 0.1;
+  double _maxExposureTime = 30.0;
+
+  // Aurora presets (exposure time in seconds)
+  final Map<String, Map<String, double>> _auroraPresets = {
+    'Faint Aurora': {'iso': 3200.0, 'exposure': 10.0, 'focus': 1.0},
+    'Moderate Aurora': {'iso': 1600.0, 'exposure': 5.0, 'focus': 1.0},
+    'Bright Aurora': {'iso': 800.0, 'exposure': 3.0, 'focus': 1.0},
+    'Star Focus': {'iso': 1600.0, 'exposure': 8.0, 'focus': 1.0},
+  };
 
   @override
   void initState() {
@@ -78,13 +108,19 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       vsync: this,
     );
 
+    _manualControlsController = AnimationController(
+      duration: const Duration(milliseconds: 300),
+      vsync: this,
+    );
+
     // Check if an initial image was provided (from gallery upload)
     if (widget.initialImagePath != null) {
       _isPhotoTaken = true;
       _capturedPhoto = File(widget.initialImagePath!);
       _photoPath = widget.initialImagePath;
-      // For uploaded images, we don't need the slide animation
-      // The details form will show directly in the main content area
+    } else {
+      // Initialize native camera for new photos
+      _initializeNativeCamera();
     }
 
     _getCurrentLocation();
@@ -101,17 +137,164 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     WidgetsBinding.instance.removeObserver(this);
     _pulseController.dispose();
     _slideController.dispose();
+    _manualControlsController.dispose();
     _descriptionController.dispose();
     _auroraDataTimer?.cancel();
+    _captureTimer?.cancel();
+    _disposeNativeCamera();
     super.dispose();
   }
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
     if (state == AppLifecycleState.inactive) {
-      // Handle inactive state if needed
+      _disposeNativeCamera();
     } else if (state == AppLifecycleState.resumed) {
-      // Handle resumed state if needed
+      if (!_isPhotoTaken && widget.initialImagePath == null) {
+        _initializeNativeCamera();
+      }
+    }
+  }
+
+  // Native camera methods
+  Future<void> _initializeNativeCamera() async {
+    try {
+      print('🔧 Initializing native camera...');
+      
+      // Request camera permissions
+      final cameraPermission = await Permission.camera.request();
+      if (!cameraPermission.isGranted) {
+        _showPermissionDialog('Camera permission is required for aurora photography');
+        return;
+      }
+
+      final result = await _cameraChannel.invokeMethod('initializeCamera');
+      
+      if (result['success'] == true) {
+        setState(() {
+          _isCameraInitialized = true;
+          
+          // Update camera capability ranges from native side
+          _minISO = result['minISO']?.toDouble() ?? 100.0;
+          _maxISO = result['maxISO']?.toDouble() ?? 6400.0;
+          _minExposureTime = result['minExposureTime']?.toDouble() ?? 0.1;
+          _maxExposureTime = result['maxExposureTime']?.toDouble() ?? 30.0;
+        });
+        
+        print('✅ Native camera initialized successfully');
+        print('   ISO range: ${_minISO.round()} - ${_maxISO.round()}');
+        print('   Exposure range: ${_minExposureTime}s - ${_maxExposureTime}s');
+        
+        // Apply initial settings
+        _applyCameraSettings();
+      } else {
+        throw Exception(result['error'] ?? 'Failed to initialize camera');
+      }
+      
+    } catch (e) {
+      print('❌ Failed to initialize native camera: $e');
+      _showErrorDialog('Failed to initialize professional camera controls: $e');
+    }
+  }
+
+  Future<void> _disposeNativeCamera() async {
+    try {
+      if (_isCameraInitialized) {
+        await _cameraChannel.invokeMethod('disposeCamera');
+        setState(() {
+          _isCameraInitialized = false;
+        });
+        print('🔧 Native camera disposed');
+      }
+    } catch (e) {
+      print('⚠️ Error disposing camera: $e');
+    }
+  }
+
+  Future<void> _applyCameraSettings() async {
+    if (!_isCameraInitialized) return;
+    
+    try {
+      print('📸 Applying camera settings to native camera:');
+      print('   ISO: ${_currentISO.round()}');
+      print('   Exposure Time: ${_currentExposureTime}s');
+      print('   Focus: ${_currentFocus == 1.0 ? 'Infinity' : '${(_currentFocus * 100).round()}%'}');
+
+      final result = await _cameraChannel.invokeMethod('applyCameraSettings', {
+        'iso': _currentISO.round(),
+        'exposureTimeSeconds': _currentExposureTime,
+        'focusDistance': _currentFocus,
+      });
+
+      if (result['success'] == true) {
+        HapticFeedback.selectionClick();
+        print('✅ Camera settings applied successfully');
+      } else {
+        print('⚠️ Failed to apply some camera settings: ${result['error']}');
+      }
+      
+    } catch (e) {
+      print('❌ Error applying camera settings: $e');
+    }
+  }
+
+  Future<void> _capturePhotoWithNativeCamera() async {
+    if (!_isCameraInitialized || _isCapturing) return;
+
+    setState(() {
+      _isCapturing = true;
+    });
+
+    try {
+      print('📸 Starting native camera capture...');
+      print('   Settings: ISO ${_currentISO.round()}, ${_currentExposureTime}s exposure');
+
+      // Show capture feedback
+      HapticFeedback.heavyImpact();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('📸 Capturing ${_currentExposureTime}s exposure... Please hold still!'),
+          backgroundColor: _primaryColor,
+          duration: Duration(seconds: (_currentExposureTime + 2).round()),
+        ),
+      );
+
+      final result = await _cameraChannel.invokeMethod('capturePhoto');
+
+      if (result['success'] == true) {
+        final imagePath = result['imagePath'] as String;
+        
+        setState(() {
+          _isPhotoTaken = true;
+          _photoPath = imagePath;
+          _capturedPhoto = File(imagePath);
+          _isCapturing = false;
+        });
+
+        print('✅ Photo captured successfully: $imagePath');
+        
+        // Hide snackbar and show success
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('✅ Aurora photo captured successfully!'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+
+      } else {
+        throw Exception(result['error'] ?? 'Failed to capture photo');
+      }
+
+    } catch (e) {
+      setState(() {
+        _isCapturing = false;
+      });
+      
+      print('❌ Failed to capture photo: $e');
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      _showErrorDialog('Failed to capture photo: $e');
     }
   }
 
@@ -257,26 +440,120 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       _isPhotoTaken = false;
     });
     _slideController.reverse();
+    
+    // Reinitialize camera
+    _initializeNativeCamera();
+  }
+
+  void _toggleManualControls() {
+    setState(() {
+      _showManualControls = !_showManualControls;
+    });
+    if (_showManualControls) {
+      _manualControlsController.forward();
+    } else {
+      _manualControlsController.reverse();
+    }
+  }
+
+  void _toggleNightVision() {
+    setState(() {
+      _nightVisionMode = !_nightVisionMode;
+    });
+    HapticFeedback.lightImpact();
+  }
+
+  void _applyAuroraPreset(String presetName) {
+    final preset = _auroraPresets[presetName];
+    if (preset != null) {
+      setState(() {
+        _currentISO = preset['iso']!.clamp(_minISO, _maxISO);
+        _currentExposureTime = preset['exposure']!.clamp(_minExposureTime, _maxExposureTime);
+        _currentFocus = preset['focus']!;
+      });
+      
+      // Apply settings to camera
+      _applyCameraSettings();
+      
+      HapticFeedback.mediumImpact();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Applied $presetName preset - ISO: ${_currentISO.round()}, Exposure: ${_currentExposureTime}s'),
+          backgroundColor: _primaryColor.withOpacity(0.9),
+          duration: Duration(seconds: 2),
+        ),
+      );
+    }
+  }
+
+  void _startCaptureTimer() {
+    if (_timerSeconds == 0) {
+      // Capture immediately
+      _capturePhotoWithNativeCamera();
+      return;
+    }
+
+    setState(() {
+      _isTimerActive = true;
+      _countdownValue = _timerSeconds;
+    });
+
+    HapticFeedback.heavyImpact();
+
+    _captureTimer = Timer.periodic(Duration(seconds: 1), (timer) {
+      setState(() {
+        _countdownValue--;
+      });
+
+      // Haptic feedback for countdown
+      if (_countdownValue > 0) {
+        HapticFeedback.lightImpact();
+      }
+
+      if (_countdownValue <= 0) {
+        timer.cancel();
+        setState(() {
+          _isTimerActive = false;
+        });
+        _capturePhotoWithNativeCamera();
+      }
+    });
+  }
+
+  void _cancelTimer() {
+    if (_captureTimer != null) {
+      _captureTimer!.cancel();
+      setState(() {
+        _isTimerActive = false;
+        _countdownValue = 0;
+      });
+      HapticFeedback.lightImpact();
+    }
   }
 
   void _showPermissionDialog(String message) {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.black,
-        title: const Text('Permission Required', style: TextStyle(color: Colors.tealAccent)),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
+        backgroundColor: _nightVisionMode ? Colors.red.shade900 : Colors.black,
+        title: Text('Permission Required', 
+          style: TextStyle(color: _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent)),
+        content: Text(message, 
+          style: TextStyle(color: _nightVisionMode ? Colors.red.shade200 : Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel', style: TextStyle(color: Colors.white54)),
+            child: Text('Cancel', 
+              style: TextStyle(color: _nightVisionMode ? Colors.red.shade300 : Colors.white54)),
           ),
           TextButton(
             onPressed: () {
               Navigator.pop(context);
               openAppSettings();
             },
-            child: const Text('Settings', style: TextStyle(color: Colors.tealAccent)),
+            child: Text('Settings', 
+              style: TextStyle(color: _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent)),
           ),
         ],
       ),
@@ -287,13 +564,16 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.black,
-        title: const Text('Error', style: TextStyle(color: Colors.red)),
-        content: Text(message, style: const TextStyle(color: Colors.white70)),
+        backgroundColor: _nightVisionMode ? Colors.red.shade900 : Colors.black,
+        title: Text('Error', 
+          style: TextStyle(color: Colors.red)),
+        content: Text(message, 
+          style: TextStyle(color: _nightVisionMode ? Colors.red.shade200 : Colors.white70)),
         actions: [
           TextButton(
             onPressed: () => Navigator.pop(context),
-            child: const Text('OK', style: TextStyle(color: Colors.tealAccent)),
+            child: Text('OK', 
+              style: TextStyle(color: _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent)),
           ),
         ],
       ),
@@ -305,15 +585,19 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       context: context,
       barrierDismissible: false,
       builder: (context) => AlertDialog(
-        backgroundColor: Colors.black,
+        backgroundColor: _nightVisionMode ? Colors.red.shade900 : Colors.black,
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
         title: Row(
           children: [
-            Icon(Icons.check_circle, color: Colors.tealAccent, size: 28),
+            Icon(Icons.check_circle, 
+              color: _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent, size: 28),
             SizedBox(width: 12),
             Text(
               'Aurora Shared!',
-              style: TextStyle(color: Colors.tealAccent, fontSize: 18),
+              style: TextStyle(
+                color: _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent, 
+                fontSize: 18
+              ),
             ),
           ],
         ),
@@ -321,26 +605,27 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '🌌 Your aurora sighting has been shared with the community! Other aurora hunters in your area will be notified.',
-              style: TextStyle(color: Colors.white70),
+              '🌌 Your professional aurora photo has been shared with the community!',
+              style: TextStyle(color: _nightVisionMode ? Colors.red.shade200 : Colors.white70),
             ),
             SizedBox(height: 16),
             Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.tealAccent.withOpacity(0.1),
+                color: (_nightVisionMode ? Colors.red.shade100 : Colors.tealAccent).withOpacity(0.1),
                 borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                border: Border.all(color: (_nightVisionMode ? Colors.red.shade100 : Colors.tealAccent).withOpacity(0.3)),
               ),
               child: Row(
                 children: [
-                  Icon(Icons.print, color: Colors.tealAccent, size: 20),
+                  Icon(Icons.print, 
+                    color: _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent, size: 20),
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      'Your photo is now available in the Print Shop!',
+                      'Your high-quality aurora photo is now available in the Print Shop!',
                       style: TextStyle(
-                        color: Colors.tealAccent,
+                        color: _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent,
                         fontSize: 12,
                         fontWeight: FontWeight.bold,
                       ),
@@ -359,7 +644,10 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
             },
             child: Text(
               'VIEW COMMUNITY',
-              style: TextStyle(color: Colors.tealAccent, fontWeight: FontWeight.bold),
+              style: TextStyle(
+                color: _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent, 
+                fontWeight: FontWeight.bold
+              ),
             ),
           ),
         ],
@@ -397,35 +685,42 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     return double.parse(sum.toStringAsFixed(2));
   }
 
+  Color get _primaryColor => _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent;
+  Color get _backgroundColor => _nightVisionMode ? Colors.red.shade900.withOpacity(0.9) : Colors.black;
+  Color get _textColor => _nightVisionMode ? Colors.red.shade100 : Colors.white;
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      backgroundColor: Colors.black,
+      backgroundColor: _nightVisionMode ? Colors.red.shade900 : Colors.black,
       body: Stack(
         children: [
-          // Only show camera if no initial image was provided and photo hasn't been taken
+          // Native camera preview
           if (!_isPhotoTaken && widget.initialImagePath == null)
             Positioned.fill(
-              child: CameraAwesomeBuilder.awesome(
-                saveConfig: SaveConfig.photo(),
-                onMediaTap: (mediaCapture) {
-                  mediaCapture.captureRequest.when(
-                    single: (single) {
-                      setState(() {
-                        _isPhotoTaken = true;
-                        _photoPath = single.file?.path;
-                        // FIX: Set _capturedPhoto so the image appears in the details form
-                        if (single.file != null) {
-                          _capturedPhoto = File(single.file!.path);
-                        }
-                      });
+              child: _isCameraInitialized 
+                ? AndroidView(
+                    viewType: 'aurora_camera_preview',
+                    onPlatformViewCreated: (id) {
+                      print('🔧 Camera preview created with ID: $id');
                     },
-                    multiple: (multiple) {
-                      // Not used in this app
-                    },
-                  );
-                },
-              ),
+                  )
+                : Container(
+                    color: Colors.black,
+                    child: Center(
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          CircularProgressIndicator(color: _primaryColor),
+                          SizedBox(height: 20),
+                          Text(
+                            'Initializing Professional Camera...',
+                            style: TextStyle(color: _textColor, fontSize: 16),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
             )
           // Show details form for both camera photos and uploaded images
           else if (_isPhotoTaken)
@@ -441,9 +736,9 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
             child: Container(
               padding: EdgeInsets.all(12),
               decoration: BoxDecoration(
-                color: Colors.black.withOpacity(0.7),
+                color: _backgroundColor.withOpacity(0.8),
                 borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                border: Border.all(color: _primaryColor.withOpacity(0.3)),
               ),
               child: Column(
                 mainAxisSize: MainAxisSize.min,
@@ -460,14 +755,14 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                   Container(
                     padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
+                      color: _backgroundColor.withOpacity(0.5),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                      border: Border.all(color: _primaryColor.withOpacity(0.3)),
                     ),
                     child: Text(
                       AuroraMessageService.getCombinedAuroraMessage(_currentKp, _currentBzH),
                       style: TextStyle(
-                        color: Colors.white70,
+                        color: _textColor.withOpacity(0.8),
                         fontSize: 12,
                         fontWeight: FontWeight.w500,
                       ),
@@ -478,27 +773,180 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
             ),
           ),
 
-          // Camera controls (only show for camera mode)
-          if (_showCaptureUI && !_showDetailsForm && widget.initialImagePath == null)
+          // Top-left controls (Close button)
+          if (!_isPhotoTaken && widget.initialImagePath == null)
             Positioned(
-              bottom: MediaQuery.of(context).padding.bottom + 20,
+              top: MediaQuery.of(context).padding.top + 80,
               left: 20,
+              child: Container(
+                decoration: BoxDecoration(
+                  color: _backgroundColor.withOpacity(0.7),
+                  shape: BoxShape.circle,
+                  border: Border.all(color: _primaryColor.withOpacity(0.3)),
+                ),
+                child: IconButton(
+                  icon: Icon(Icons.close, color: _textColor),
+                  onPressed: () => Navigator.of(context).pop(),
+                ),
+              ),
+            ),
+
+          // Top-right controls (Night vision and manual controls)
+          if (!_isPhotoTaken && widget.initialImagePath == null)
+            Positioned(
+              top: MediaQuery.of(context).padding.top + 80,
               right: 20,
-              child: Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              child: Column(
                 children: [
-                  // Close button
+                  // Night vision toggle
                   Container(
                     decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: BoxShape.circle,
+                      color: _backgroundColor.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(color: _primaryColor.withOpacity(0.3)),
                     ),
                     child: IconButton(
-                      icon: const Icon(Icons.close, color: Colors.white),
-                      onPressed: () => Navigator.of(context).pop(),
+                      icon: Icon(
+                        _nightVisionMode ? Icons.visibility_off : Icons.visibility,
+                        color: _primaryColor,
+                      ),
+                      onPressed: _toggleNightVision,
+                    ),
+                  ),
+                  
+                  SizedBox(height: 12),
+                  
+                  // Manual controls toggle
+                  Container(
+                    decoration: BoxDecoration(
+                      color: _backgroundColor.withOpacity(0.7),
+                      borderRadius: BorderRadius.circular(25),
+                      border: Border.all(color: _primaryColor.withOpacity(0.3)),
+                    ),
+                    child: IconButton(
+                      icon: Icon(Icons.tune, color: _primaryColor),
+                      onPressed: _toggleManualControls,
                     ),
                   ),
                 ],
+              ),
+            ),
+
+          // Current settings display and capture button
+          if (!_isPhotoTaken && widget.initialImagePath == null && !_showManualControls)
+            Positioned(
+              bottom: MediaQuery.of(context).padding.bottom + 40,
+              left: 20,
+              right: 20,
+              child: Column(
+                children: [
+                  // Current settings display
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    decoration: BoxDecoration(
+                      color: _backgroundColor.withOpacity(0.8),
+                      borderRadius: BorderRadius.circular(20),
+                      border: Border.all(color: _primaryColor.withOpacity(0.3)),
+                    ),
+                    child: Row(
+                      mainAxisAlignment: MainAxisAlignment.spaceAround,
+                      children: [
+                        Text(
+                          'ISO: ${_currentISO.round()}',
+                          style: TextStyle(
+                            color: _primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          '${_currentExposureTime.toStringAsFixed(1)}s',
+                          style: TextStyle(
+                            color: _primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                        Text(
+                          'Focus: ${_currentFocus == 1.0 ? '∞' : '${(_currentFocus * 100).round()}%'}',
+                          style: TextStyle(
+                            color: _primaryColor,
+                            fontSize: 12,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  
+                  SizedBox(height: 20),
+                  
+                  // Professional capture button
+                  Container(
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      gradient: RadialGradient(
+                        colors: [
+                          _primaryColor,
+                          _primaryColor.withOpacity(0.7),
+                        ],
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: _primaryColor.withOpacity(0.5),
+                          blurRadius: 20,
+                          spreadRadius: 5,
+                        ),
+                      ],
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        borderRadius: BorderRadius.circular(40),
+                        onTap: _isCapturing ? null : _startCaptureTimer,
+                        child: Container(
+                          width: 80,
+                          height: 80,
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(color: Colors.white, width: 3),
+                          ),
+                          child: _isCapturing
+                              ? Padding(
+                                  padding: EdgeInsets.all(20),
+                                  child: CircularProgressIndicator(
+                                    color: Colors.white,
+                                    strokeWidth: 3,
+                                  ),
+                                )
+                              : Icon(
+                                  _timerSeconds > 0 ? Icons.timer : Icons.camera_alt,
+                                  color: Colors.white,
+                                  size: 35,
+                                ),
+                        ),
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+
+          // Manual controls panel
+          if (_showManualControls && !_isPhotoTaken)
+            Positioned(
+              bottom: 0,
+              left: 0,
+              right: 0,
+              child: SlideTransition(
+                position: Tween<Offset>(
+                  begin: const Offset(0, 1),
+                  end: Offset.zero,
+                ).animate(CurvedAnimation(
+                  parent: _manualControlsController,
+                  curve: Curves.easeOut,
+                )),
+                child: _buildManualControlsPanel(),
               ),
             ),
 
@@ -514,35 +962,486 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
               )),
               child: _buildDetailsForm(),
             ),
+
+          // Timer countdown overlay
+          if (_isTimerActive)
+            Positioned.fill(
+              child: Container(
+                color: (_nightVisionMode ? Colors.red.shade900 : Colors.black).withOpacity(0.9),
+                child: Center(
+                  child: Column(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Container(
+                        width: 200,
+                        height: 200,
+                        decoration: BoxDecoration(
+                          shape: BoxShape.circle,
+                          border: Border.all(
+                            color: _primaryColor,
+                            width: 4,
+                          ),
+                        ),
+                        child: Center(
+                          child: Text(
+                            '$_countdownValue',
+                            style: TextStyle(
+                              color: _primaryColor,
+                              fontSize: 80,
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                        ),
+                      ),
+                      SizedBox(height: 30),
+                      Text(
+                        'Get ready for ${_currentExposureTime}s professional exposure...',
+                        style: TextStyle(
+                          color: _textColor,
+                          fontSize: 18,
+                          fontWeight: FontWeight.w500,
+                        ),
+                        textAlign: TextAlign.center,
+                      ),
+                      SizedBox(height: 10),
+                      Text(
+                        'ISO: ${_currentISO.round()} • Focus: ${_currentFocus == 1.0 ? '∞' : '${(_currentFocus * 100).round()}%'}',
+                        style: TextStyle(
+                          color: _textColor.withOpacity(0.7),
+                          fontSize: 14,
+                        ),
+                      ),
+                      SizedBox(height: 30),
+                      TextButton(
+                        onPressed: _cancelTimer,
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+                          decoration: BoxDecoration(
+                            border: Border.all(color: _textColor.withOpacity(0.5)),
+                            borderRadius: BorderRadius.circular(25),
+                          ),
+                          child: Text(
+                            'Cancel',
+                            style: TextStyle(
+                              color: _textColor.withOpacity(0.8),
+                              fontSize: 16,
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ),
         ],
       ),
     );
   }
 
+  Widget _buildManualControlsPanel() {
+    return Container(
+      height: MediaQuery.of(context).size.height * 0.6,
+      decoration: BoxDecoration(
+        color: _backgroundColor,
+        borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
+        border: Border.all(color: _primaryColor.withOpacity(0.3)),
+      ),
+      child: Column(
+        children: [
+          // Handle bar
+          Container(
+            margin: EdgeInsets.only(top: 8),
+            width: 40,
+            height: 4,
+            decoration: BoxDecoration(
+              color: _textColor.withOpacity(0.5),
+              borderRadius: BorderRadius.circular(2),
+            ),
+          ),
 
+          // Header
+          Padding(
+            padding: EdgeInsets.all(16),
+            child: Row(
+              children: [
+                Icon(Icons.camera_alt, color: _primaryColor, size: 24),
+                SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'Professional Aurora Photography',
+                    style: TextStyle(
+                      color: _textColor,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                ),
+                IconButton(
+                  onPressed: _toggleManualControls,
+                  icon: Icon(Icons.close, color: _textColor),
+                ),
+              ],
+            ),
+          ),
+
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.symmetric(horizontal: 16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // Camera status
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: _isCameraInitialized 
+                          ? Colors.green.withOpacity(0.1)
+                          : Colors.orange.withOpacity(0.1),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: _isCameraInitialized 
+                            ? Colors.green.withOpacity(0.3)
+                            : Colors.orange.withOpacity(0.3)
+                      ),
+                    ),
+                    child: Row(
+                      children: [
+                        Icon(
+                          _isCameraInitialized ? Icons.check_circle : Icons.warning,
+                          color: _isCameraInitialized ? Colors.green : Colors.orange,
+                          size: 20
+                        ),
+                        SizedBox(width: 8),
+                        Expanded(
+                          child: Text(
+                            _isCameraInitialized 
+                                ? 'Professional Camera Ready - Full Manual Control'
+                                : 'Initializing Camera2 API...',
+                            style: TextStyle(
+                              color: _isCameraInitialized ? Colors.green : Colors.orange,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 20),
+
+                  // Aurora Presets
+                  Text(
+                    'Aurora Presets',
+                    style: TextStyle(
+                      color: _primaryColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Wrap(
+                    spacing: 8,
+                    runSpacing: 8,
+                    children: _auroraPresets.keys.map((presetName) {
+                      return InkWell(
+                        onTap: () => _applyAuroraPreset(presetName),
+                        borderRadius: BorderRadius.circular(8),
+                        child: Container(
+                          padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                          decoration: BoxDecoration(
+                            color: _primaryColor.withOpacity(0.1),
+                            borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: _primaryColor.withOpacity(0.3)),
+                          ),
+                          child: Text(
+                            presetName,
+                            style: TextStyle(
+                              color: _primaryColor,
+                              fontSize: 12,
+                              fontWeight: FontWeight.w500,
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  SizedBox(height: 24),
+
+                  // Manual Controls
+                  _buildSliderControl(
+                    'ISO',
+                    _currentISO,
+                    _minISO,
+                    _maxISO,
+                    (value) {
+                      setState(() => _currentISO = value);
+                      _applyCameraSettings();
+                    },
+                    '${_currentISO.round()}',
+                  ),
+
+                  SizedBox(height: 20),
+
+                  _buildSliderControl(
+                    'Exposure Time',
+                    _currentExposureTime,
+                    _minExposureTime,
+                    _maxExposureTime,
+                    (value) {
+                      setState(() => _currentExposureTime = value);
+                      _applyCameraSettings();
+                    },
+                    '${_currentExposureTime.toStringAsFixed(1)}s',
+                  ),
+
+                  SizedBox(height: 20),
+
+                  _buildSliderControl(
+                    'Focus',
+                    _currentFocus,
+                    0.0,
+                    1.0,
+                    (value) {
+                      setState(() => _currentFocus = value);
+                      _applyCameraSettings();
+                    },
+                    _currentFocus == 1.0 ? '∞' : '${(_currentFocus * 100).round()}%',
+                  ),
+
+                  SizedBox(height: 24),
+
+                  // Timer
+                  Text(
+                    'Self Timer',
+                    style: TextStyle(
+                      color: _primaryColor,
+                      fontSize: 16,
+                      fontWeight: FontWeight.bold,
+                    ),
+                  ),
+                  SizedBox(height: 12),
+                  Row(
+                    children: [0, 3, 5, 10].map((seconds) {
+                      return Expanded(
+                        child: Padding(
+                          padding: EdgeInsets.symmetric(horizontal: 4),
+                          child: InkWell(
+                            onTap: () => setState(() => _timerSeconds = seconds),
+                            borderRadius: BorderRadius.circular(8),
+                            child: Container(
+                              padding: EdgeInsets.symmetric(vertical: 12),
+                              decoration: BoxDecoration(
+                                color: _timerSeconds == seconds
+                                    ? _primaryColor.withOpacity(0.2)
+                                    : _primaryColor.withOpacity(0.05),
+                                borderRadius: BorderRadius.circular(8),
+                                border: Border.all(
+                                  color: _timerSeconds == seconds
+                                      ? _primaryColor
+                                      : _primaryColor.withOpacity(0.3),
+                                ),
+                              ),
+                              child: Text(
+                                seconds == 0 ? 'Off' : '${seconds}s',
+                                textAlign: TextAlign.center,
+                                style: TextStyle(
+                                  color: _timerSeconds == seconds
+                                      ? _primaryColor
+                                      : _textColor.withOpacity(0.7),
+                                  fontSize: 14,
+                                  fontWeight: FontWeight.w500,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      );
+                    }).toList(),
+                  ),
+
+                  SizedBox(height: 32),
+
+                  // Professional capture button
+                  SizedBox(
+                    width: double.infinity,
+                    height: 50,
+                    child: ElevatedButton(
+                      onPressed: (_isCameraInitialized && !_isCapturing) ? _startCaptureTimer : null,
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: _primaryColor,
+                        foregroundColor: _nightVisionMode ? Colors.red.shade900 : Colors.black,
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(25),
+                        ),
+                        elevation: 8,
+                      ),
+                      child: _isCapturing
+                          ? Row(
+                              mainAxisAlignment: MainAxisAlignment.center,
+                              children: [
+                                SizedBox(
+                                  width: 20,
+                                  height: 20,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                    color: _nightVisionMode ? Colors.red.shade900 : Colors.black,
+                                  ),
+                                ),
+                                SizedBox(width: 12),
+                                Text(
+                                  'Capturing ${_currentExposureTime}s...',
+                                  style: TextStyle(
+                                    fontSize: 16,
+                                    fontWeight: FontWeight.bold,
+                                  ),
+                                ),
+                              ],
+                            )
+                          : Text(
+                              _timerSeconds == 0 
+                                ? '📸 PROFESSIONAL CAPTURE (${_currentExposureTime}s)' 
+                                : '📸 START TIMER (${_timerSeconds}s)',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                letterSpacing: 0.5,
+                              ),
+                            ),
+                    ),
+                  ),
+
+                  SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildSliderControl(
+    String label,
+    double value,
+    double min,
+    double max,
+    ValueChanged<double> onChanged,
+    String displayValue,
+  ) {
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Row(
+          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+          children: [
+            Text(
+              label,
+              style: TextStyle(
+                color: _primaryColor,
+                fontSize: 16,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+              decoration: BoxDecoration(
+                color: _primaryColor.withOpacity(0.1),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: _primaryColor.withOpacity(0.3)),
+              ),
+              child: Text(
+                displayValue,
+                style: TextStyle(
+                  color: _primaryColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
+            ),
+          ],
+        ),
+        SizedBox(height: 8),
+        SliderTheme(
+          data: SliderTheme.of(context).copyWith(
+            activeTrackColor: _primaryColor,
+            inactiveTrackColor: _primaryColor.withOpacity(0.3),
+            thumbColor: _primaryColor,
+            overlayColor: _primaryColor.withOpacity(0.2),
+            trackHeight: 4,
+          ),
+          child: Slider(
+            value: value,
+            min: min,
+            max: max,
+            onChanged: onChanged,
+          ),
+        ),
+      ],
+    );
+  }
 
   Widget _buildConditionItem(String label, String value) {
-    Color valueColor = Colors.white;
+    Color valueColor = _textColor;
     if (label == 'BzH') {
       // Color coding for BzH values
       double bzValue = double.tryParse(value.replaceAll(' nT', '')) ?? 0;
       if (bzValue < -10) {
-        valueColor = Colors.red; // Strong negative BzH (good for aurora)
+        valueColor = _nightVisionMode ? Colors.red.shade200 : Colors.red;
       } else if (bzValue < -5) {
-        valueColor = Colors.orange; // Moderate negative BzH
+        valueColor = _nightVisionMode ? Colors.red.shade300 : Colors.orange;
       } else if (bzValue < 0) {
-        valueColor = Colors.yellow; // Slight negative BzH
+        valueColor = _nightVisionMode ? Colors.red.shade400 : Colors.yellow;
       }
     } else if (label == 'Kp') {
       // Color coding for Kp values
       double kpValue = double.tryParse(value) ?? 0;
       if (kpValue >= 5) {
-        valueColor = Colors.red; // Strong geomagnetic activity
+        valueColor = _nightVisionMode ? Colors.red.shade200 : Colors.red;
       } else if (kpValue >= 4) {
-        valueColor = Colors.orange; // Moderate geomagnetic activity
+        valueColor = _nightVisionMode ? Colors.red.shade300 : Colors.orange;
       } else if (kpValue >= 3) {
-        valueColor = Colors.yellow; // Minor geomagnetic activity
+        valueColor = _nightVisionMode ? Colors.red.shade400 : Colors.yellow;
       }
+    } else if (label == '📍') {
+      return Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            style: TextStyle(
+              color: _primaryColor,
+              fontSize: 12,
+              fontWeight: FontWeight.bold,
+            ),
+          ),
+          SizedBox(height: 4),
+          Tooltip(
+            message: value,
+            child: Container(
+              constraints: const BoxConstraints(maxWidth: 160),
+              padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: _backgroundColor.withOpacity(0.5),
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: valueColor.withOpacity(0.3)),
+              ),
+              child: Text(
+                value.length > 24 ? value.substring(0, 24) + '...' : value,
+                style: TextStyle(
+                  color: valueColor,
+                  fontSize: 14,
+                  fontWeight: FontWeight.w600,
+                ),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 1,
+              ),
+            ),
+          ),
+        ],
+      );
     }
 
     return Column(
@@ -551,7 +1450,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
         Text(
           label,
           style: TextStyle(
-            color: Colors.tealAccent,
+            color: _primaryColor,
             fontSize: 12,
             fontWeight: FontWeight.bold,
           ),
@@ -560,7 +1459,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
         Container(
           padding: EdgeInsets.symmetric(horizontal: 8, vertical: 4),
           decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.5),
+            color: _backgroundColor.withOpacity(0.5),
             borderRadius: BorderRadius.circular(8),
             border: Border.all(color: valueColor.withOpacity(0.3)),
           ),
@@ -581,9 +1480,9 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     return Container(
       height: MediaQuery.of(context).size.height * 0.75,
       decoration: BoxDecoration(
-        color: Colors.black,
+        color: _backgroundColor,
         borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+        border: Border.all(color: _primaryColor.withOpacity(0.3)),
       ),
       child: Column(
         children: [
@@ -593,7 +1492,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
             width: 40,
             height: 4,
             decoration: BoxDecoration(
-              color: Colors.white54,
+              color: _textColor.withOpacity(0.5),
               borderRadius: BorderRadius.circular(2),
             ),
           ),
@@ -605,15 +1504,15 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
               children: [
                 Icon(
                   Icons.auto_awesome,
-                  color: Colors.tealAccent,
+                  color: _primaryColor,
                   size: 24,
                 ),
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Share Your Aurora Sighting',
+                    'Share Your Professional Aurora Photo',
                     style: TextStyle(
-                      color: Colors.white,
+                      color: _textColor,
                       fontSize: 18,
                       fontWeight: FontWeight.bold,
                     ),
@@ -623,7 +1522,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                   onPressed: _retakePhoto,
                   child: Text(
                     widget.initialImagePath != null ? 'Change Photo' : 'Retake',
-                    style: TextStyle(color: Colors.tealAccent),
+                    style: TextStyle(color: _primaryColor),
                   ),
                 ),
               ],
@@ -643,7 +1542,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                       width: double.infinity,
                       decoration: BoxDecoration(
                         borderRadius: BorderRadius.circular(12),
-                        border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                        border: Border.all(color: _primaryColor.withOpacity(0.3)),
                       ),
                       child: ClipRRect(
                         borderRadius: BorderRadius.circular(12),
@@ -672,7 +1571,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                   Text(
                     'Description (Optional)',
                     style: TextStyle(
-                      color: Colors.tealAccent,
+                      color: _primaryColor,
                       fontSize: 16,
                       fontWeight: FontWeight.bold,
                     ),
@@ -680,25 +1579,25 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                   SizedBox(height: 8),
                   TextField(
                     controller: _descriptionController,
-                    style: TextStyle(color: Colors.white),
+                    style: TextStyle(color: _textColor),
                     maxLength: 200,
                     maxLines: 3,
                     decoration: InputDecoration(
                       hintText: 'Describe what you see...',
-                      hintStyle: TextStyle(color: Colors.white54),
+                      hintStyle: TextStyle(color: _textColor.withOpacity(0.5)),
                       border: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.tealAccent.withOpacity(0.5)),
+                        borderSide: BorderSide(color: _primaryColor.withOpacity(0.5)),
                       ),
                       enabledBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.tealAccent.withOpacity(0.5)),
+                        borderSide: BorderSide(color: _primaryColor.withOpacity(0.5)),
                       ),
                       focusedBorder: OutlineInputBorder(
                         borderRadius: BorderRadius.circular(8),
-                        borderSide: BorderSide(color: Colors.tealAccent),
+                        borderSide: BorderSide(color: _primaryColor),
                       ),
-                      counterStyle: TextStyle(color: Colors.white54),
+                      counterStyle: TextStyle(color: _textColor.withOpacity(0.5)),
                     ),
                     onChanged: (value) {
                       _description = value;
@@ -711,18 +1610,18 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                   Container(
                     padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
+                      color: _textColor.withOpacity(0.05),
                       borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: Colors.white.withOpacity(0.1)),
+                      border: Border.all(color: _textColor.withOpacity(0.1)),
                     ),
                     child: Row(
                       children: [
-                        Icon(Icons.location_on, color: Colors.tealAccent, size: 20),
+                        Icon(Icons.location_on, color: _primaryColor, size: 20),
                         SizedBox(width: 8),
                         Expanded(
                           child: Text(
                             _locationName,
-                            style: TextStyle(color: Colors.white70, fontSize: 14),
+                            style: TextStyle(color: _textColor.withOpacity(0.8), fontSize: 14),
                           ),
                         ),
                       ],
@@ -744,8 +1643,8 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
               child: ElevatedButton(
                 onPressed: _isSubmitting ? null : _submitAuroraSighting,
                 style: ElevatedButton.styleFrom(
-                  backgroundColor: Colors.tealAccent,
-                  foregroundColor: Colors.black,
+                  backgroundColor: _primaryColor,
+                  foregroundColor: _nightVisionMode ? Colors.red.shade900 : Colors.black,
                   shape: RoundedRectangleBorder(
                     borderRadius: BorderRadius.circular(25),
                   ),
@@ -760,7 +1659,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                       height: 20,
                       child: CircularProgressIndicator(
                         strokeWidth: 2,
-                        color: Colors.black,
+                        color: _nightVisionMode ? Colors.red.shade900 : Colors.black,
                       ),
                     ),
                     SizedBox(width: 12),
@@ -774,7 +1673,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                   ],
                 )
                     : Text(
-                  '🌌 SHOUT AURORA SIGHTING!',
+                  '🌌 SHOUT PROFESSIONAL AURORA SIGHTING!',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

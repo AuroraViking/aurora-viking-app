@@ -5,6 +5,7 @@ import 'my_photos_tab.dart';
 import 'prints_tab.dart' as prints;
 import 'aurora_alerts_tab.dart';
 import 'spot_aurora_screen.dart';
+import 'camera_debug_screen.dart'; // Add this import
 import '../services/firebase_service.dart';
 import '../widgets/user_badge.dart';
 import 'tour_auth_screen.dart';
@@ -20,7 +21,6 @@ import '../widgets/forecast/bortle_map.dart';
 import '../widgets/forecast/cloud_forecast_map.dart';
 import '../services/auroral_power_service.dart';
 import '../widgets/forecast/auroral_power_chart.dart';
-import 'spot_aurora_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -216,6 +216,16 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     }
   }
 
+  // Add camera debug function
+  void _openCameraDebug() {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CameraDebugScreen(),
+      ),
+    );
+  }
+
   void _onItemTapped(int index) {
     if (index != _selectedIndex) {
       setState(() {
@@ -309,8 +319,19 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
                 fit: BoxFit.contain,
               ),
             ),
-            actions: const [
-              Padding(
+            actions: [
+              // Add debug button here (temporary for testing)
+              if (isAuthenticated)
+                IconButton(
+                  icon: const Icon(
+                    Icons.bug_report,
+                    color: Colors.orange,
+                    size: 24,
+                  ),
+                  onPressed: _openCameraDebug,
+                  tooltip: 'Camera Debug',
+                ),
+              const Padding(
                 padding: EdgeInsets.only(right: 16),
                 child: UserBadge(),
               ),

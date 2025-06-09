@@ -92,46 +92,78 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
           style: TextStyle(color: Colors.white),
         ),
       ),
-      body: Center(
-        child: Column(
-          mainAxisAlignment: MainAxisAlignment.center,
-          children: [
-            const Text(
-              'How would you like to share your aurora sighting?',
-              style: TextStyle(
-                color: Colors.white,
-                fontSize: 18,
-                fontWeight: FontWeight.bold,
+      body: LayoutBuilder(
+        builder: (context, constraints) {
+          final isNarrow = constraints.maxWidth < 500;
+          return SingleChildScrollView(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
+            child: Center(
+              child: Column(
+                mainAxisAlignment: MainAxisAlignment.center,
+                children: [
+                  const Text(
+                    'How would you like to share your aurora sighting?',
+                    style: TextStyle(
+                      color: Colors.white,
+                      fontSize: 18,
+                      fontWeight: FontWeight.bold,
+                    ),
+                    textAlign: TextAlign.center,
+                  ),
+                  const SizedBox(height: 32),
+                  isNarrow
+                      ? Column(
+                          children: [
+                            _buildOptionButton(
+                              icon: Icons.camera_alt,
+                              label: 'Take Photo',
+                              onTap: _openCamera,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildOptionButton(
+                              icon: Icons.upload_file,
+                              label: 'Upload Photo',
+                              onTap: _uploadImage,
+                            ),
+                            const SizedBox(height: 16),
+                            _buildOptionButton(
+                              icon: Icons.location_on,
+                              label: 'Just Location',
+                              onTap: () {
+                                _showLocationDescriptionDialog();
+                              },
+                            ),
+                          ],
+                        )
+                      : Row(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          children: [
+                            _buildOptionButton(
+                              icon: Icons.camera_alt,
+                              label: 'Take Photo',
+                              onTap: _openCamera,
+                            ),
+                            const SizedBox(width: 24),
+                            _buildOptionButton(
+                              icon: Icons.upload_file,
+                              label: 'Upload Photo',
+                              onTap: _uploadImage,
+                            ),
+                            const SizedBox(width: 24),
+                            _buildOptionButton(
+                              icon: Icons.location_on,
+                              label: 'Just Location',
+                              onTap: () {
+                                _showLocationDescriptionDialog();
+                              },
+                            ),
+                          ],
+                        ),
+                ],
               ),
-              textAlign: TextAlign.center,
             ),
-            const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                _buildOptionButton(
-                  icon: Icons.camera_alt,
-                  label: 'Take Photo',
-                  onTap: _openCamera,
-                ),
-                const SizedBox(width: 24),
-                _buildOptionButton(
-                  icon: Icons.upload_file,
-                  label: 'Upload Photo',
-                  onTap: _uploadImage,
-                ),
-                const SizedBox(width: 24),
-                _buildOptionButton(
-                  icon: Icons.location_on,
-                  label: 'Just Location',
-                  onTap: () {
-                    _showLocationDescriptionDialog();
-                  },
-                ),
-              ],
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }

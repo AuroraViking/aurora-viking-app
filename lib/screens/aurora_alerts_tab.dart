@@ -14,7 +14,6 @@ import 'spot_aurora_screen.dart';
 import 'edit_profile_screen.dart';
 import 'user_profile_screen.dart';
 import '../widgets/aurora_photo_viewer.dart';
-import 'spot_aurora_screen.dart';
 
 class AuroraAlertsTab extends StatefulWidget {
   const AuroraAlertsTab({super.key});
@@ -277,51 +276,56 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
       onSightingTapped: (sighting) {
         showModalBottomSheet(
           context: context,
-          builder: (context) => AuroraPostCard(
-            sighting: sighting,
-            onLike: (sightingId) async {
-              try {
-                final result = await _firebaseService.confirmAuroraSighting(sightingId);
-                if (mounted) {
-                  setState(() {
-                    final index = _nearbySightings.indexWhere((s) => s.id == sightingId);
-                    if (index != -1) {
-                      _nearbySightings[index] = _nearbySightings[index].copyWith(
-                        confirmations: result['confirmations'],
-                        confirmedByUsers: result['verifications'],
-                        isVerified: result['confirmations'] >= 3,
-                      );
+          isScrollControlled: true,
+          builder: (context) => SafeArea(
+            child: SingleChildScrollView(
+              child: AuroraPostCard(
+                sighting: sighting,
+                onLike: (sightingId) async {
+                  try {
+                    final result = await _firebaseService.confirmAuroraSighting(sightingId);
+                    if (mounted) {
+                      setState(() {
+                        final index = _nearbySightings.indexWhere((s) => s.id == sightingId);
+                        if (index != -1) {
+                          _nearbySightings[index] = _nearbySightings[index].copyWith(
+                            confirmations: result['confirmations'],
+                            confirmedByUsers: result['verifications'],
+                            isVerified: result['confirmations'] >= 3,
+                          );
+                        }
+                      });
                     }
-                  });
-                }
-              } catch (e) {
-                print('Error liking sighting: $e');
-                ScaffoldMessenger.of(context).showSnackBar(
-                  const SnackBar(
-                    content: Text('Failed to like sighting. Please try again.'),
-                    backgroundColor: Colors.red,
-                  ),
-                );
-              }
-            },
-            onViewProfile: (userId) {
-              Navigator.pop(context);
-              Navigator.push(
-                context,
-                MaterialPageRoute(
-                  builder: (context) => UserProfileScreen(userId: userId),
-                ),
-              );
-            },
-            onViewLocation: (location) {
-              Navigator.pop(context);
-              _mapController?.animateCamera(
-                CameraUpdate.newLatLngZoom(
-                  LatLng(location.latitude, location.longitude),
-                  15,
-                ),
-              );
-            },
+                  } catch (e) {
+                    print('Error liking sighting: $e');
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(
+                        content: Text('Failed to like sighting. Please try again.'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                onViewProfile: (userId) {
+                  Navigator.pop(context);
+                  Navigator.push(
+                    context,
+                    MaterialPageRoute(
+                      builder: (context) => UserProfileScreen(userId: userId),
+                    ),
+                  );
+                },
+                onViewLocation: (location) {
+                  Navigator.pop(context);
+                  _mapController?.animateCamera(
+                    CameraUpdate.newLatLngZoom(
+                      LatLng(location.latitude, location.longitude),
+                      15,
+                    ),
+                  );
+                },
+              ),
+            ),
           ),
         );
       },

@@ -125,7 +125,11 @@ class _PrintsTabState extends State<PrintsTab> with TickerProviderStateMixin {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _buildCartSheet(),
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: _buildCartSheet(),
+        ),
+      ),
     );
   }
 
@@ -136,7 +140,11 @@ class _PrintsTabState extends State<PrintsTab> with TickerProviderStateMixin {
       context: context,
       isScrollControlled: true,
       backgroundColor: Colors.transparent,
-      builder: (context) => _buildPhotoOptionsSheet(),
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: _buildPhotoOptionsSheet(),
+        ),
+      ),
     );
   }
 
@@ -483,87 +491,91 @@ class _PrintsTabState extends State<PrintsTab> with TickerProviderStateMixin {
     showModalBottomSheet(
       context: context,
       backgroundColor: Colors.transparent,
-      builder: (context) => Container(
-        decoration: const BoxDecoration(
-          color: Color(0xFF1A1F2E),
-          borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
-        ),
-        child: Column(
-          mainAxisSize: MainAxisSize.min,
-          children: [
-            // Handle
-            Container(
-              margin: const EdgeInsets.symmetric(vertical: 12),
-              width: 40,
-              height: 4,
-              decoration: BoxDecoration(
-                color: Colors.white.withOpacity(0.3),
-                borderRadius: BorderRadius.circular(2),
-              ),
+      builder: (context) => SafeArea(
+        child: SingleChildScrollView(
+          child: Container(
+            decoration: const BoxDecoration(
+              color: Color(0xFF1A1F2E),
+              borderRadius: BorderRadius.vertical(top: Radius.circular(20)),
             ),
-
-            // Header
-            Padding(
-              padding: const EdgeInsets.symmetric(horizontal: 20),
-              child: Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      product.name,
-                      style: const TextStyle(
-                        color: Colors.white,
-                        fontSize: 20,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                // Handle
+                Container(
+                  margin: const EdgeInsets.symmetric(vertical: 12),
+                  width: 40,
+                  height: 4,
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.3),
+                    borderRadius: BorderRadius.circular(2),
                   ),
-                  IconButton(
-                    onPressed: () => Navigator.pop(context),
-                    icon: const Icon(Icons.close, color: Colors.white),
-                  ),
-                ],
-              ),
-            ),
+                ),
 
-            // Variants
-            Flexible(
-              child: ListView.builder(
-                shrinkWrap: true,
-                padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-                itemCount: product.variants.length,
-                itemBuilder: (context, index) {
-                  final variant = product.variants[index];
-                  return Container(
-                    margin: const EdgeInsets.only(bottom: 12),
-                    child: ListTile(
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                        side: BorderSide(color: const Color(0xFF00D4AA).withOpacity(0.3)),
-                      ),
-                      tileColor: const Color(0xFF0A0F1C),
-                      title: Text(variant.name, style: const TextStyle(color: Colors.white)),
-                      subtitle: Text(
-                        'Size: ${variant.size}',
-                        style: TextStyle(color: Colors.white.withOpacity(0.6)),
-                      ),
-                      trailing: Text(
-                        '\$${variant.price.toStringAsFixed(2)}',
-                        style: const TextStyle(
-                          color: Color(0xFF00D4AA),
-                          fontWeight: FontWeight.bold,
+                // Header
+                Padding(
+                  padding: const EdgeInsets.symmetric(horizontal: 20),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          product.name,
+                          style: const TextStyle(
+                            color: Colors.white,
+                            fontSize: 20,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                       ),
-                      onTap: () {
-                        _addToCart(product, variant);
-                        Navigator.pop(context);
-                      },
-                    ),
-                  );
-                },
-              ),
+                      IconButton(
+                        onPressed: () => Navigator.pop(context),
+                        icon: const Icon(Icons.close, color: Colors.white),
+                      ),
+                    ],
+                  ),
+                ),
+
+                // Variants
+                Flexible(
+                  child: ListView.builder(
+                    shrinkWrap: true,
+                    padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
+                    itemCount: product.variants.length,
+                    itemBuilder: (context, index) {
+                      final variant = product.variants[index];
+                      return Container(
+                        margin: const EdgeInsets.only(bottom: 12),
+                        child: ListTile(
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                            side: BorderSide(color: const Color(0xFF00D4AA).withOpacity(0.3)),
+                          ),
+                          tileColor: const Color(0xFF0A0F1C),
+                          title: Text(variant.name, style: const TextStyle(color: Colors.white)),
+                          subtitle: Text(
+                            'Size: ${variant.size}',
+                            style: TextStyle(color: Colors.white.withOpacity(0.6)),
+                          ),
+                          trailing: Text(
+                            '\$${variant.price.toStringAsFixed(2)}',
+                            style: const TextStyle(
+                              color: Color(0xFF00D4AA),
+                              fontWeight: FontWeight.bold,
+                            ),
+                          ),
+                          onTap: () {
+                            _addToCart(product, variant);
+                            Navigator.pop(context);
+                          },
+                        ),
+                      );
+                    },
+                  ),
+                ),
+                const SizedBox(height: 20),
+              ],
             ),
-            const SizedBox(height: 20),
-          ],
+          ),
         ),
       ),
     );

@@ -254,7 +254,16 @@ Shared via Aurora Viking App
                 const Icon(Icons.location_on, color: Colors.white70),
                 const SizedBox(width: 8),
                 Text(
-                  '${widget.sighting.locationName} (${widget.sighting.location.latitude.toStringAsFixed(2)}, ${widget.sighting.location.longitude.toStringAsFixed(2)})',
+                  widget.sighting.locationName.length > 24
+                      ? widget.sighting.locationName.substring(0, 24) + '...'
+                      : widget.sighting.locationName,
+                  style: const TextStyle(color: Colors.white70),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
+                ),
+                const SizedBox(width: 8),
+                Text(
+                  '(${widget.sighting.location.latitude.toStringAsFixed(2)}, ${widget.sighting.location.longitude.toStringAsFixed(2)})',
                   style: const TextStyle(color: Colors.white70),
                 ),
               ],
@@ -570,4 +579,4 @@ Shared via Aurora Viking App
       default: return Colors.grey;
     }
   }
-} 
+}
