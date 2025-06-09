@@ -27,7 +27,7 @@ android {
 
     defaultConfig {
         applicationId = "com.example.aurora_viking_app"  // ← MATCH FIREBASE REGISTRATION!
-        minSdk = 23
+        minSdk = 24 // Updated from 23 to 24 for camerawesome compatibility
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
         versionName = flutter.versionName

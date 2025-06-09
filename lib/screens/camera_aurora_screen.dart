@@ -1,7 +1,7 @@
 // lib/screens/camera_aurora_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
-import 'package:camera/camera.dart';
+import 'package:camerawesome/camerawesome_plugin.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:geocoding/geocoding.dart';
 import 'package:permission_handler/permission_handler.dart';
@@ -33,12 +33,6 @@ class CameraAuroraScreen extends StatefulWidget {
 class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     with WidgetsBindingObserver, TickerProviderStateMixin {
 
-  // Camera variables
-  CameraController? _cameraController;
-  List<CameraDescription>? _cameras;
-  bool _isCameraInitialized = false;
-  bool _isRearCamera = true;
-
   // Location variables
   Position? _currentPosition;
   String _locationName = 'Unknown Location';
@@ -65,6 +59,10 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   final TextEditingController _descriptionController = TextEditingController();
   final FirebaseService _firebaseService = FirebaseService();
 
+  // Camera variables
+  bool _isPhotoTaken = false;
+  String? _photoPath;
+
   @override
   void initState() {
     super.initState();
@@ -80,7 +78,15 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       vsync: this,
     );
 
-    _initializeCamera();
+    // Check if an initial image was provided (from gallery upload)
+    if (widget.initialImagePath != null) {
+      _isPhotoTaken = true;
+      _capturedPhoto = File(widget.initialImagePath!);
+      _photoPath = widget.initialImagePath;
+      // For uploaded images, we don't need the slide animation
+      // The details form will show directly in the main content area
+    }
+
     _getCurrentLocation();
     _fetchAuroraData();
     
@@ -93,7 +99,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
-    _cameraController?.dispose();
     _pulseController.dispose();
     _slideController.dispose();
     _descriptionController.dispose();
@@ -103,65 +108,10 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
 
   @override
   void didChangeAppLifecycleState(AppLifecycleState state) {
-    if (_cameraController == null || !_cameraController!.value.isInitialized) {
-      return;
-    }
-
     if (state == AppLifecycleState.inactive) {
-      _cameraController?.dispose();
+      // Handle inactive state if needed
     } else if (state == AppLifecycleState.resumed) {
-      _initializeCamera();
-    }
-  }
-
-  Future<void> _initializeCamera() async {
-    try {
-      if (widget.initialImagePath != null) {
-        setState(() {
-          _capturedPhoto = File(widget.initialImagePath!);
-          _showCaptureUI = true;
-          _showDetailsForm = true;
-        });
-        _slideController.forward();
-        return;
-      }
-
-      // Request camera permission
-      final cameraStatus = await Permission.camera.request();
-      if (cameraStatus != PermissionStatus.granted) {
-        _showPermissionDialog('Camera permission is required to capture aurora photos');
-        return;
-      }
-
-      // Get available cameras
-      _cameras = await availableCameras();
-      if (_cameras!.isEmpty) {
-        _showErrorDialog('No cameras available on this device');
-        return;
-      }
-
-      // Initialize camera controller
-      final camera = _cameras!.firstWhere(
-            (camera) => camera.lensDirection == CameraLensDirection.back,
-        orElse: () => _cameras!.first,
-      );
-
-      _cameraController = CameraController(
-        camera,
-        ResolutionPreset.high,
-        enableAudio: false,
-        imageFormatGroup: ImageFormatGroup.jpeg,
-      );
-
-      await _cameraController!.initialize();
-
-      setState(() {
-        _isCameraInitialized = true;
-        _showCaptureUI = true;
-      });
-
-    } catch (e) {
-      _showErrorDialog('Failed to initialize camera: ${e.toString()}');
+      // Handle resumed state if needed
     }
   }
 
@@ -245,58 +195,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     }
   }
 
-  Future<void> _capturePhoto() async {
-    if (!_isCameraInitialized || _cameraController == null) return;
-
-    try {
-      HapticFeedback.mediumImpact();
-
-      final image = await _cameraController!.takePicture();
-      final file = File(image.path);
-
-      setState(() {
-        _capturedPhoto = file;
-        _showDetailsForm = true;
-      });
-
-      _slideController.forward();
-
-    } catch (e) {
-      _showErrorDialog('Failed to capture photo: ${e.toString()}');
-    }
-  }
-
-  Future<void> _switchCamera() async {
-    if (!_isCameraInitialized || _cameras == null || _cameras!.length < 2) return;
-
-    try {
-      final newCamera = _cameras!.firstWhere(
-            (camera) => camera.lensDirection ==
-            (_isRearCamera ? CameraLensDirection.front : CameraLensDirection.back),
-        orElse: () => _cameras!.first,
-      );
-
-      await _cameraController!.dispose();
-
-      _cameraController = CameraController(
-        newCamera,
-        ResolutionPreset.high,
-        enableAudio: false,
-      );
-
-      await _cameraController!.initialize();
-
-      setState(() {
-        _isRearCamera = !_isRearCamera;
-      });
-
-      HapticFeedback.selectionClick();
-
-    } catch (e) {
-      _showErrorDialog('Failed to switch camera: ${e.toString()}');
-    }
-  }
-
   Future<void> _submitAuroraSighting() async {
     if (_capturedPhoto == null || _currentPosition == null) {
       _showErrorDialog('Please capture a photo and ensure location is available');
@@ -347,9 +245,16 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   }
 
   void _retakePhoto() {
+    // If we came from an uploaded image, just go back instead of showing camera
+    if (widget.initialImagePath != null) {
+      Navigator.of(context).pop();
+      return;
+    }
+    
     setState(() {
       _capturedPhoto = null;
       _showDetailsForm = false;
+      _isPhotoTaken = false;
     });
     _slideController.reverse();
   }
@@ -498,29 +403,34 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       backgroundColor: Colors.black,
       body: Stack(
         children: [
-          // Camera preview
-          if (_isCameraInitialized && _cameraController != null)
+          // Only show camera if no initial image was provided and photo hasn't been taken
+          if (!_isPhotoTaken && widget.initialImagePath == null)
             Positioned.fill(
-              child: _buildCameraUI(),
-            )
-          else
-            Positioned.fill(
-              child: Container(
-                color: Colors.black,
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      CircularProgressIndicator(color: Colors.tealAccent),
-                      SizedBox(height: 16),
-                      Text(
-                        'Initializing camera...',
-                        style: TextStyle(color: Colors.white70, fontSize: 16),
-                      ),
-                    ],
-                  ),
-                ),
+              child: CameraAwesomeBuilder.awesome(
+                saveConfig: SaveConfig.photo(),
+                onMediaTap: (mediaCapture) {
+                  mediaCapture.captureRequest.when(
+                    single: (single) {
+                      setState(() {
+                        _isPhotoTaken = true;
+                        _photoPath = single.file?.path;
+                        // FIX: Set _capturedPhoto so the image appears in the details form
+                        if (single.file != null) {
+                          _capturedPhoto = File(single.file!.path);
+                        }
+                      });
+                    },
+                    multiple: (multiple) {
+                      // Not used in this app
+                    },
+                  );
+                },
               ),
+            )
+          // Show details form for both camera photos and uploaded images
+          else if (_isPhotoTaken)
+            Positioned.fill(
+              child: _buildDetailsForm(),
             ),
 
           // Aurora conditions overlay
@@ -568,8 +478,8 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
             ),
           ),
 
-          // Camera controls
-          if (_showCaptureUI && !_showDetailsForm)
+          // Camera controls (only show for camera mode)
+          if (_showCaptureUI && !_showDetailsForm && widget.initialImagePath == null)
             Positioned(
               bottom: MediaQuery.of(context).padding.bottom + 20,
               left: 20,
@@ -577,62 +487,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
               child: Row(
                 mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                 children: [
-                  // Switch camera button
-                  Container(
-                    decoration: BoxDecoration(
-                      color: Colors.black.withOpacity(0.5),
-                      shape: BoxShape.circle,
-                    ),
-                    child: IconButton(
-                      onPressed: _cameras != null && _cameras!.length > 1 ? _switchCamera : null,
-                      icon: Icon(
-                        Icons.flip_camera_ios,
-                        color: _cameras != null && _cameras!.length > 1 ? Colors.white : Colors.grey,
-                        size: 28,
-                      ),
-                    ),
-                  ),
-
-                  // Capture button
-                  AnimatedBuilder(
-                    animation: _pulseController,
-                    builder: (context, child) {
-                      return Transform.scale(
-                        scale: 1.0 + (_pulseController.value * 0.1),
-                        child: GestureDetector(
-                          onTap: _capturePhoto,
-                          child: Container(
-                            width: 80,
-                            height: 80,
-                            decoration: BoxDecoration(
-                              shape: BoxShape.circle,
-                              border: Border.all(color: Colors.tealAccent, width: 4),
-                              boxShadow: [
-                                BoxShadow(
-                                  color: Colors.tealAccent.withOpacity(0.5),
-                                  blurRadius: 20,
-                                  spreadRadius: 2,
-                                ),
-                              ],
-                            ),
-                            child: Container(
-                              margin: const EdgeInsets.all(8),
-                              decoration: const BoxDecoration(
-                                color: Colors.tealAccent,
-                                shape: BoxShape.circle,
-                              ),
-                              child: const Icon(
-                                Icons.camera_alt,
-                                color: Colors.black,
-                                size: 32,
-                              ),
-                            ),
-                          ),
-                        ),
-                      );
-                    },
-                  ),
-
                   // Close button
                   Container(
                     decoration: BoxDecoration(
@@ -664,6 +518,8 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       ),
     );
   }
+
+
 
   Widget _buildConditionItem(String label, String value) {
     Color valueColor = Colors.white;
@@ -766,7 +622,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                 TextButton(
                   onPressed: _retakePhoto,
                   child: Text(
-                    'Retake',
+                    widget.initialImagePath != null ? 'Change Photo' : 'Retake',
                     style: TextStyle(color: Colors.tealAccent),
                   ),
                 ),
@@ -930,146 +786,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           ),
         ],
       ),
-    );
-  }
-
-  Widget _buildCameraUI() {
-    if (!_isCameraInitialized || _cameraController == null) {
-      return const Center(
-        child: CircularProgressIndicator(color: Colors.tealAccent),
-      );
-    }
-
-    return Stack(
-      children: [
-        // Camera preview
-        CameraPreview(_cameraController!),
-
-        // Aurora conditions overlay
-        Positioned(
-          top: MediaQuery.of(context).padding.top + 16,
-          left: 16,
-          right: 16,
-          child: Container(
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
-            ),
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
-                  children: [
-                    _buildConditionItem('BzH', '${_currentBzH.toStringAsFixed(1)} nT'),
-                    _buildConditionItem('Kp', _currentKp.toStringAsFixed(1)),
-                    _buildConditionItem('📍', _locationName),
-                  ],
-                ),
-                SizedBox(height: 8),
-                Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
-                  ),
-                  child: Text(
-                    AuroraMessageService.getCombinedAuroraMessage(_currentKp, _currentBzH),
-                    style: TextStyle(
-                      color: Colors.white70,
-                      fontSize: 12,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ),
-
-        // Camera controls
-        if (_showCaptureUI && !_showDetailsForm)
-          Positioned(
-            bottom: MediaQuery.of(context).padding.bottom + 20,
-            left: 20,
-            right: 20,
-            child: Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-              children: [
-                // Switch camera button
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    onPressed: _cameras != null && _cameras!.length > 1 ? _switchCamera : null,
-                    icon: Icon(
-                      Icons.flip_camera_ios,
-                      color: _cameras != null && _cameras!.length > 1 ? Colors.white : Colors.grey,
-                      size: 28,
-                    ),
-                  ),
-                ),
-
-                // Capture button
-                AnimatedBuilder(
-                  animation: _pulseController,
-                  builder: (context, child) {
-                    return Transform.scale(
-                      scale: 1.0 + (_pulseController.value * 0.1),
-                      child: GestureDetector(
-                        onTap: _capturePhoto,
-                        child: Container(
-                          width: 80,
-                          height: 80,
-                          decoration: BoxDecoration(
-                            shape: BoxShape.circle,
-                            border: Border.all(color: Colors.tealAccent, width: 4),
-                            boxShadow: [
-                              BoxShadow(
-                                color: Colors.tealAccent.withOpacity(0.5),
-                                blurRadius: 20,
-                                spreadRadius: 2,
-                              ),
-                            ],
-                          ),
-                          child: Container(
-                            margin: const EdgeInsets.all(8),
-                            decoration: const BoxDecoration(
-                              color: Colors.tealAccent,
-                              shape: BoxShape.circle,
-                            ),
-                            child: const Icon(
-                              Icons.camera_alt,
-                              color: Colors.black,
-                              size: 32,
-                            ),
-                          ),
-                        ),
-                      ),
-                    );
-                  },
-                ),
-
-                // Close button
-                Container(
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.5),
-                    shape: BoxShape.circle,
-                  ),
-                  child: IconButton(
-                    icon: const Icon(Icons.close, color: Colors.white),
-                    onPressed: () => Navigator.of(context).pop(),
-                  ),
-                ),
-              ],
-            ),
-          ),
-      ],
     );
   }
 }

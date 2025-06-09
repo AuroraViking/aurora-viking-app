@@ -178,7 +178,7 @@ class MyApp extends StatelessWidget {
           foregroundColor: Colors.white,
           elevation: 2,
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           elevation: 4,
           shape: RoundedRectangleBorder(
             borderRadius: BorderRadius.circular(12),
@@ -202,7 +202,7 @@ class MyApp extends StatelessWidget {
           foregroundColor: Colors.tealAccent,
           elevation: 2,
         ),
-        cardTheme: CardTheme(
+        cardTheme: CardThemeData(
           color: Colors.white10,
           elevation: 4,
           shape: RoundedRectangleBorder(

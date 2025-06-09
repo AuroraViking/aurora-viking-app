@@ -20,6 +20,7 @@ import '../widgets/forecast/bortle_map.dart';
 import '../widgets/forecast/cloud_forecast_map.dart';
 import '../services/auroral_power_service.dart';
 import '../widgets/forecast/auroral_power_chart.dart';
+import 'spot_aurora_screen.dart';
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});

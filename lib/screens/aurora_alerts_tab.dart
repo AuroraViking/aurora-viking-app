@@ -14,6 +14,7 @@ import 'spot_aurora_screen.dart';
 import 'edit_profile_screen.dart';
 import 'user_profile_screen.dart';
 import '../widgets/aurora_photo_viewer.dart';
+import 'spot_aurora_screen.dart';
 
 class AuroraAlertsTab extends StatefulWidget {
   const AuroraAlertsTab({super.key});
