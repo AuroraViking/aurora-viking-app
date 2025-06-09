@@ -31,6 +31,7 @@ import java.io.FileOutputStream
 import java.util.concurrent.Executor
 import java.util.concurrent.Semaphore
 import java.util.concurrent.TimeUnit
+import java.util.concurrent.atomic.AtomicBoolean
 
 class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private lateinit var channel: MethodChannel
@@ -118,13 +119,18 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
 
     private fun initializeCamera(result: MethodChannel.Result) {
         Log.d(TAG, "Initializing camera...")
-        
+        val replied = AtomicBoolean(false)
+        fun safeSuccess(value: Any?) {
+            if (replied.compareAndSet(false, true)) result.success(value)
+        }
+        fun safeError(code: String, message: String?, details: Any?) {
+            if (replied.compareAndSet(false, true)) result.error(code, message, details)
+        }
         if (ContextCompat.checkSelfPermission(context, Manifest.permission.CAMERA) 
             != PackageManager.PERMISSION_GRANTED) {
-            result.error("PERMISSION_DENIED", "Camera permission not granted", null)
+            safeError("PERMISSION_DENIED", "Camera permission not granted", null)
             return
         }
-
         try {
             startBackgroundThread()
             
@@ -132,7 +138,7 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             val cameraId = getBestCameraId()
             
             if (cameraId == null) {
-                result.error("NO_CAMERA", "No suitable camera found", null)
+                safeError("NO_CAMERA", "No suitable camera found", null)
                 return
             }
 
@@ -175,7 +181,7 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         1.0 // 1s default
                     }
                     
-                    result.success(mapOf(
+                    safeSuccess(mapOf(
                         "success" to true,
                         "minISO" to (isoRange?.lower ?: 100),
                         "maxISO" to (isoRange?.upper ?: 3200),
@@ -185,13 +191,13 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                         "supportsManualPostProcessing" to supportsManualPostProcessing
                     ))
                 } else {
-                    result.error("CAMERA_OPEN_FAILED", error ?: "Failed to open camera", null)
+                    safeError("CAMERA_OPEN_FAILED", error ?: "Failed to open camera", null)
                 }
             }
 
         } catch (e: Exception) {
             Log.e(TAG, "Error initializing camera", e)
-            result.error("INITIALIZATION_FAILED", e.message, null)
+            safeError("INITIALIZATION_FAILED", e.message, null)
         }
     }
 

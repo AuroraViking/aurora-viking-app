@@ -739,51 +739,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
               child: _buildDetailsForm(),
             ),
 
-          // Aurora conditions overlay
-          Positioned(
-            top: MediaQuery.of(context).padding.top + 16,
-            left: 16,
-            right: 16,
-            child: Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: _backgroundColor.withOpacity(0.8),
-                borderRadius: BorderRadius.circular(12),
-                border: Border.all(color: _primaryColor.withOpacity(0.3)),
-              ),
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceAround,
-                    children: [
-                      _buildConditionItem('BzH', '${_currentBzH.toStringAsFixed(1)} nT'),
-                      _buildConditionItem('Kp', _currentKp.toStringAsFixed(1)),
-                      _buildConditionItem('📍', _locationName),
-                    ],
-                  ),
-                  SizedBox(height: 8),
-                  Container(
-                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
-                    decoration: BoxDecoration(
-                      color: _backgroundColor.withOpacity(0.5),
-                      borderRadius: BorderRadius.circular(8),
-                      border: Border.all(color: _primaryColor.withOpacity(0.3)),
-                    ),
-                    child: Text(
-                      AuroraMessageService.getCombinedAuroraMessage(_currentKp, _currentBzH),
-                      style: TextStyle(
-                        color: _textColor.withOpacity(0.8),
-                        fontSize: 12,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
-            ),
-          ),
-
           // Top-left controls (Close button)
           if (!_isPhotoTaken && widget.initialImagePath == null)
             Positioned(
@@ -1521,7 +1476,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Share Your Professional Aurora Photo',
+                    'Post sighting',
                     style: TextStyle(
                       color: _textColor,
                       fontSize: 18,
@@ -1539,6 +1494,50 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
               ],
             ),
           ),
+
+          // --- Moved conditions card here ---
+          Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 16.0, vertical: 4.0),
+            child: Container(
+              padding: EdgeInsets.all(12),
+              decoration: BoxDecoration(
+                color: _backgroundColor.withOpacity(0.8),
+                borderRadius: BorderRadius.circular(12),
+                border: Border.all(color: _primaryColor.withOpacity(0.3)),
+              ),
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceAround,
+                    children: [
+                      _buildConditionItem('BzH', '${_currentBzH.toStringAsFixed(1)} nT'),
+                      _buildConditionItem('Kp', _currentKp.toStringAsFixed(1)),
+                      _buildConditionItem('📍', _locationName),
+                    ],
+                  ),
+                  SizedBox(height: 8),
+                  Container(
+                    padding: EdgeInsets.symmetric(horizontal: 12, vertical: 6),
+                    decoration: BoxDecoration(
+                      color: _backgroundColor.withOpacity(0.5),
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: _primaryColor.withOpacity(0.3)),
+                    ),
+                    child: Text(
+                      AuroraMessageService.getCombinedAuroraMessage(_currentKp, _currentBzH),
+                      style: TextStyle(
+                        color: _textColor.withOpacity(0.8),
+                        fontSize: 12,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+            ),
+          ),
+          // --- End moved conditions card ---
 
           Expanded(
             child: SingleChildScrollView(
@@ -1675,7 +1674,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                     ),
                     SizedBox(width: 12),
                     Text(
-                      'Sharing Aurora...',
+                      'Posting sighting...',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -1684,7 +1683,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                   ],
                 )
                     : Text(
-                  '🌌 SHOUT PROFESSIONAL AURORA SIGHTING!',
+                  'Post sighting',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
