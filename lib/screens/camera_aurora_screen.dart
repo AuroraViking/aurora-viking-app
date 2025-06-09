@@ -97,7 +97,11 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   void initState() {
     super.initState();
     WidgetsBinding.instance.addObserver(this);
-
+    // Lock orientation to portrait (vertical)
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+    ]);
     _pulseController = AnimationController(
       duration: const Duration(seconds: 2),
       vsync: this,
@@ -135,6 +139,13 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   @override
   void dispose() {
     WidgetsBinding.instance.removeObserver(this);
+    // Restore orientation to allow all
+    SystemChrome.setPreferredOrientations([
+      DeviceOrientation.portraitUp,
+      DeviceOrientation.portraitDown,
+      DeviceOrientation.landscapeLeft,
+      DeviceOrientation.landscapeRight,
+    ]);
     _pulseController.dispose();
     _slideController.dispose();
     _manualControlsController.dispose();
