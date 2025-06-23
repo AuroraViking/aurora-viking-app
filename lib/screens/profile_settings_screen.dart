@@ -257,16 +257,6 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                           // TODO: Implement privacy settings
                         },
                       ),
-                      if (userType != 'tour_participant')
-                        _buildSettingsItem(
-                          context,
-                          'Verify Tour Booking',
-                          Icons.card_travel,
-                          Colors.tealAccent,
-                          onTap: () {
-                            _showVerifyTourDialog(context);
-                          },
-                        ),
                       if (userType == 'tour_participant')
                         _buildSettingsItem(
                           context,
@@ -505,4 +495,4 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       ),
     );
   }
-} 
+}

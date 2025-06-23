@@ -143,10 +143,11 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return const ForecastTab();
       case 1:
         return const AuroraAlertsTab();
-      case 2:
-        return const MyPhotosTab();
-      case 3:
-        return const prints.PrintsTab();
+      // Hide Photos and Prints tabs for app store launch
+      // case 2:
+      //   return const MyPhotosTab();
+      // case 3:
+      //   return const prints.PrintsTab();
       default:
         return const ForecastTab();
     }
@@ -163,8 +164,9 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       destinations: [
         _buildNavItem(0, Icons.radar, 'Forecast'),
         _buildNavItem(1, Icons.notifications, 'Aurora Sightings'),
-        _buildNavItem(2, Icons.photo_library, 'Photos'),
-        _buildNavItem(3, Icons.print, 'Prints'),
+        // Hide Photos and Prints tabs for app store launch
+        // _buildNavItem(2, Icons.photo_library, 'Photos'),
+        // _buildNavItem(3, Icons.print, 'Prints'),
       ],
     );
   }

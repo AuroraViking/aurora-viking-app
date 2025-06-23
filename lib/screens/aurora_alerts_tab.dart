@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:google_maps_flutter/google_maps_flutter.dart';
 import 'package:geolocator/geolocator.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import '../services/firebase_service.dart';
 import '../models/aurora_sighting.dart';
 import '../models/user_aurora_photo.dart';
@@ -31,7 +30,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
   List<AuroraSighting> _nearbySightings = [];
   bool _isLoading = true;
   bool _isLoadingLocation = true;
-  String _activityLevel = 'No Recent Activity';
+  final String _activityLevel = 'No Recent Activity';
   GoogleMapController? _mapController;
 
   @override
@@ -276,56 +275,51 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
       onSightingTapped: (sighting) {
         showModalBottomSheet(
           context: context,
-          isScrollControlled: true,
-          builder: (context) => SafeArea(
-            child: SingleChildScrollView(
-              child: AuroraPostCard(
-                sighting: sighting,
-                onLike: (sightingId) async {
-                  try {
-                    final result = await _firebaseService.confirmAuroraSighting(sightingId);
-                    if (mounted) {
-                      setState(() {
-                        final index = _nearbySightings.indexWhere((s) => s.id == sightingId);
-                        if (index != -1) {
-                          _nearbySightings[index] = _nearbySightings[index].copyWith(
-                            confirmations: result['confirmations'],
-                            confirmedByUsers: result['verifications'],
-                            isVerified: result['confirmations'] >= 3,
-                          );
-                        }
-                      });
+          builder: (context) => AuroraPostCard(
+            sighting: sighting,
+            onLike: (sightingId) async {
+              try {
+                final result = await _firebaseService.confirmAuroraSighting(sightingId);
+                if (mounted) {
+                  setState(() {
+                    final index = _nearbySightings.indexWhere((s) => s.id == sightingId);
+                    if (index != -1) {
+                      _nearbySightings[index] = _nearbySightings[index].copyWith(
+                        confirmations: result['confirmations'],
+                        confirmedByUsers: result['verifications'],
+                        isVerified: result['confirmations'] >= 3,
+                      );
                     }
-                  } catch (e) {
-                    print('Error liking sighting: $e');
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Failed to like sighting. Please try again.'),
-                        backgroundColor: Colors.red,
-                      ),
-                    );
-                  }
-                },
-                onViewProfile: (userId) {
-                  Navigator.pop(context);
-                  Navigator.push(
-                    context,
-                    MaterialPageRoute(
-                      builder: (context) => UserProfileScreen(userId: userId),
-                    ),
-                  );
-                },
-                onViewLocation: (location) {
-                  Navigator.pop(context);
-                  _mapController?.animateCamera(
-                    CameraUpdate.newLatLngZoom(
-                      LatLng(location.latitude, location.longitude),
-                      15,
-                    ),
-                  );
-                },
-              ),
-            ),
+                  });
+                }
+              } catch (e) {
+                print('Error liking sighting: $e');
+                ScaffoldMessenger.of(context).showSnackBar(
+                  const SnackBar(
+                    content: Text('Failed to like sighting. Please try again.'),
+                    backgroundColor: Colors.red,
+                  ),
+                );
+              }
+            },
+            onViewProfile: (userId) {
+              Navigator.pop(context);
+              Navigator.push(
+                context,
+                MaterialPageRoute(
+                  builder: (context) => UserProfileScreen(userId: userId),
+                ),
+              );
+            },
+            onViewLocation: (location) {
+              Navigator.pop(context);
+              _mapController?.animateCamera(
+                CameraUpdate.newLatLngZoom(
+                  LatLng(location.latitude, location.longitude),
+                  15,
+                ),
+              );
+            },
           ),
         );
       },
@@ -421,7 +415,6 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
                   mainAxisAlignment: MainAxisAlignment.spaceEvenly,
                   children: [
                     _buildStatColumn('Sightings', auroraSpottingCount),
-                    _buildStatColumn('Verifications', verificationCount),
                   ],
                 ),
               ),
@@ -615,14 +608,14 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
                       children: [
                         Row(
                           children: [
-                            Icon(Icons.favorite, color: Colors.redAccent, size: 16),
+                            const Icon(Icons.favorite, color: Colors.redAccent, size: 16),
                             const SizedBox(width: 4),
                             Text(
                               '$confirmations',
                               style: const TextStyle(color: Colors.white, fontWeight: FontWeight.bold, fontSize: 12),
                             ),
                             const SizedBox(width: 12),
-                            Icon(Icons.comment, color: Colors.tealAccent, size: 16),
+                            const Icon(Icons.comment, color: Colors.tealAccent, size: 16),
                             const SizedBox(width: 4),
                             Text(
                               '$commentCount',
@@ -661,7 +654,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
                         ),
                         Text(
                           photo.formattedDate,
-                          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10, shadows: [const Shadow(color: Colors.black, blurRadius: 4)]),
+                          style: TextStyle(color: Colors.white.withOpacity(0.8), fontSize: 10, shadows: const [Shadow(color: Colors.black, blurRadius: 4)]),
                         ),
                       ],
                     ),
