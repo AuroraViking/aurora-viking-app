@@ -241,12 +241,12 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
               itemCount: displayList.length + 1 + (displayList.length ~/ 5), // +1 for top ad, +1 ad every 5 posts
               itemBuilder: (context, index) {
                 if (index == 0) {
-                  // Banner ad at the very top
-                  return const AdMobBannerCard(testMode: true);
+                  // Banner ad at the very top (PRODUCTION)
+                  return const AdMobBannerCard(adUnitId: 'ca-app-pub-4178524691208335/6625766838');
                 }
-                // Insert banner ad every 5 posts (after the top ad)
+                // Insert banner ad every 5 posts (after the top ad, PRODUCTION)
                 if (index > 0 && (index % 6 == 0)) {
-                  return const AdMobBannerCard(testMode: true);
+                  return const AdMobBannerCard(adUnitId: 'ca-app-pub-4178524691208335/6625766838');
                 }
                 // Calculate the correct post index, accounting for ads
                 final numAdsBefore = (index > 0) ? ((index) ~/ 6) : 0;

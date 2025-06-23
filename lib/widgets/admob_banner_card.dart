@@ -3,8 +3,7 @@ import 'package:google_mobile_ads/google_mobile_ads.dart';
 
 class AdMobBannerCard extends StatefulWidget {
   final String? adUnitId;
-  final bool testMode;
-  const AdMobBannerCard({super.key, this.adUnitId, this.testMode = false});
+  const AdMobBannerCard({super.key, this.adUnitId});
 
   @override
   State<AdMobBannerCard> createState() => _AdMobBannerCardState();
@@ -19,7 +18,7 @@ class _AdMobBannerCardState extends State<AdMobBannerCard> {
   @override
   void initState() {
     super.initState();
-    final adUnitId = widget.testMode ? _testAdUnitId : (widget.adUnitId ?? _testAdUnitId);
+    final adUnitId = widget.adUnitId ?? _testAdUnitId;
     _bannerAd = BannerAd(
       adUnitId: adUnitId,
       size: AdSize.banner,

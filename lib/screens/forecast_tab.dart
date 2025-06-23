@@ -585,8 +585,8 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                       isNowcast: true,
                     ),
                   const SizedBox(height: 20),
-                  // AdMob banner at the bottom of the forecast section
-                  AdMobBannerCard(testMode: true),
+                  // Banner ad at the bottom of the forecast tab (production)
+                  const AdMobBannerCard(adUnitId: 'ca-app-pub-4178524691208335/6625766838'),
                 ],
               ),
             ),
