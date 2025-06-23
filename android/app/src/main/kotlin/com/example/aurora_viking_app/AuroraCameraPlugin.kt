@@ -66,6 +66,9 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private var supportsManualSensor = false
     private var supportsManualPostProcessing = false
 
+    // New member variable
+    private var useAutoFocus: Boolean = false
+
     companion object {
         private const val TAG = "AuroraCameraPlugin"
         private const val CAMERA_CHANNEL = "aurora_camera/native"
@@ -110,6 +113,11 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             }
             "disposeCamera" -> {
                 disposeCamera(result)
+            }
+            "setFocusMode" -> {
+                val auto = call.argument<Boolean>("auto") ?: false
+                useAutoFocus = auto
+                result.success(mapOf("success" to true, "auto" to useAutoFocus))
             }
             else -> {
                 result.notImplemented()
@@ -381,20 +389,19 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
     private fun applyCameraSettings(iso: Int, exposureSeconds: Double, focusDistance: Float, result: MethodChannel.Result) {
         try {
             Log.d(TAG, "Applying camera settings:")
-            Log.d(TAG, "  Requested - ISO: $iso, Exposure: ${exposureSeconds}s, Focus: $focusDistance")
+            Log.d(TAG, "  Requested - ISO: $iso, Exposure: ${exposureSeconds}s, Focus: $focusDistance, AutoFocus: $useAutoFocus")
             
             // Clamp values to supported ranges with logging
             val clampedISO = isoRange?.clamp(iso) ?: iso
             val exposureNs = (exposureSeconds * 1_000_000_000L).toLong()
             val clampedExposureNs = exposureTimeRange?.clamp(exposureNs) ?: exposureNs
-            val clampedFocus = focusDistanceRange?.clamp(focusDistance) ?: focusDistance.coerceIn(0.0f, 1.0f)
-
+            // Convert meters to diopters for manual focus
+            val focusDiopters = if (focusDistance >= 1000f) 0.0f else (1.0f / focusDistance)
+            val clampedFocus = focusDistanceRange?.clamp(focusDiopters) ?: focusDiopters
             currentISO = clampedISO
             currentExposureTime = clampedExposureNs
             currentFocusDistance = clampedFocus
-
-            Log.d(TAG, "  Applied - ISO: $currentISO, Exposure: ${currentExposureTime}ns (${currentExposureTime/1_000_000_000.0}s), Focus: $currentFocusDistance")
-            
+            Log.d(TAG, "  Applied - ISO: $currentISO, Exposure: ${currentExposureTime}ns (${currentExposureTime/1_000_000_000.0}s), Focus: $currentFocusDistance, AutoFocus: $useAutoFocus")
             result.success(mapOf(
                 "success" to true,
                 "appliedISO" to currentISO,
@@ -421,7 +428,7 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             }
 
             Log.d(TAG, "Starting photo capture")
-            Log.d(TAG, "  Using settings - ISO: $currentISO, Exposure: ${currentExposureTime}ns, Focus: $currentFocusDistance")
+            Log.d(TAG, "  Using settings - ISO: $currentISO, Exposure: ${currentExposureTime}ns, Focus: $currentFocusDistance, AutoFocus: $useAutoFocus")
 
             // Create capture request with manual settings
             val captureRequestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
@@ -433,12 +440,15 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 captureRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_OFF)
                 captureRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, currentISO)
                 captureRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, currentExposureTime)
-                
-                // Disable auto features
-                captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
-                captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF)
                 captureRequestBuilder.set(CaptureRequest.CONTROL_AWB_MODE, CameraMetadata.CONTROL_AWB_MODE_OFF)
-                captureRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, currentFocusDistance)
+                if (useAutoFocus) {
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_CONTINUOUS_PICTURE)
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_ON)
+                } else {
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AF_MODE, CameraMetadata.CONTROL_AF_MODE_OFF)
+                    captureRequestBuilder.set(CaptureRequest.CONTROL_AE_MODE, CameraMetadata.CONTROL_AE_MODE_OFF)
+                    captureRequestBuilder.set(CaptureRequest.LENS_FOCUS_DISTANCE, currentFocusDistance)
+                }
             } else {
                 Log.w(TAG, "Manual sensor controls not supported, using auto mode")
                 captureRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_AUTO)

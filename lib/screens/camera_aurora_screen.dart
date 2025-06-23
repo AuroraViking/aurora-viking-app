@@ -95,6 +95,14 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     'Star Focus': {'iso': 1600.0, 'exposure': 8.0, 'focus': 1.0},
   };
 
+  // Add these lists at the top of _CameraAuroraScreenState
+  final List<double> _isoValues = [100, 200, 400, 800, 1250, 1600, 2000, 2500, 3200, 4000, 5000, 6400];
+  final List<double> _exposureValues = [1, 2, 2.5, 5, 8, 10, 15, 20, 25, 30];
+  final List<double> _focusDistances = [0.5, 1, 2, 5, 10, 20, 50, 100, 1000]; // meters, 1000 = infinity
+
+  // Add autofocus state variable to _CameraAuroraScreenState
+  bool _autoFocus = true;
+
   @override
   void initState() {
     super.initState();
@@ -687,6 +695,18 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   Color get _backgroundColor => _nightVisionMode ? Colors.red.shade900.withOpacity(0.9) : Colors.black;
   Color get _textColor => _nightVisionMode ? Colors.red.shade100 : Colors.white;
 
+  // Add this method to toggle focus mode and call native plugin
+  Future<void> _setFocusMode(bool auto) async {
+    setState(() => _autoFocus = auto);
+    try {
+      await _cameraChannel.invokeMethod('setFocusMode', {'auto': auto});
+      // Optionally re-apply camera settings to update focus mode
+      _applyCameraSettings();
+    } catch (e) {
+      print('Error setting focus mode: $e');
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -1022,7 +1042,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                 SizedBox(width: 12),
                 Expanded(
                   child: Text(
-                    'Professional Aurora Photography',
+                    'Custom Night Mode Photography',
                     style: TextStyle(
                       color: _textColor,
                       fontSize: 18,
@@ -1124,45 +1144,56 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                   SizedBox(height: 24),
 
                   // Manual Controls
-                  _buildSliderControl(
+                  _buildDiscreteSlider(
                     'ISO',
+                    _isoValues,
                     _currentISO,
-                    _minISO,
-                    _maxISO,
                     (value) {
                       setState(() => _currentISO = value);
                       _applyCameraSettings();
                     },
-                    '${_currentISO.round()}',
+                    (v) => 'ISO ${v.toInt()}',
                   ),
 
                   SizedBox(height: 20),
 
-                  _buildSliderControl(
+                  _buildDiscreteSlider(
                     'Exposure Time',
+                    _exposureValues,
                     _currentExposureTime,
-                    _minExposureTime,
-                    _maxExposureTime,
                     (value) {
                       setState(() => _currentExposureTime = value);
                       _applyCameraSettings();
                     },
-                    '${_currentExposureTime.toStringAsFixed(1)}s',
+                    (v) => v % 1 == 0 ? '${v.toInt()}s' : '${v.toStringAsFixed(1)}s',
                   ),
 
                   SizedBox(height: 20),
 
-                  _buildSliderControl(
-                    'Focus',
-                    _currentFocus,
-                    0.0,
-                    1.0,
-                    (value) {
-                      setState(() => _currentFocus = value);
-                      _applyCameraSettings();
-                    },
-                    _currentFocus == 1.0 ? '∞' : '${(_currentFocus * 100).round()}%',
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                    children: [
+                      Text('Autofocus', style: TextStyle(color: _primaryColor, fontSize: 16, fontWeight: FontWeight.bold)),
+                      Switch(
+                        value: _autoFocus,
+                        onChanged: (val) => _setFocusMode(val),
+                        activeColor: _primaryColor,
+                      ),
+                    ],
                   ),
+                  SizedBox(height: 12),
+                  // Only show manual focus slider if autofocus is off
+                  if (!_autoFocus)
+                    _buildDiscreteSlider(
+                      'Focus',
+                      _focusDistances,
+                      _currentFocus,
+                      (value) {
+                        setState(() => _currentFocus = value);
+                        _applyCameraSettings();
+                      },
+                      (v) => v >= 1000 ? '∞' : '${v.toStringAsFixed(1)}m',
+                    ),
 
                   SizedBox(height: 24),
 
@@ -1255,7 +1286,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                             )
                           : Text(
                               _timerSeconds == 0 
-                                ? '📸 PROFESSIONAL CAPTURE (${_currentExposureTime}s)' 
+                                ? '📸 NIGHT MODE CAPTURE (${_currentExposureTime}s)' 
                                 : '📸 START TIMER (${_timerSeconds}s)',
                               style: TextStyle(
                                 fontSize: 16,
@@ -1276,14 +1307,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     );
   }
 
-  Widget _buildSliderControl(
-    String label,
-    double value,
-    double min,
-    double max,
-    ValueChanged<double> onChanged,
-    String displayValue,
-  ) {
+  Widget _buildDiscreteSlider(String label, List<double> values, double currentValue, ValueChanged<double> onChanged, String Function(double) display) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -1306,7 +1330,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                 border: Border.all(color: _primaryColor.withOpacity(0.3)),
               ),
               child: Text(
-                displayValue,
+                display(currentValue),
                 style: TextStyle(
                   color: _primaryColor,
                   fontSize: 14,
@@ -1317,20 +1341,17 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           ],
         ),
         SizedBox(height: 8),
-        SliderTheme(
-          data: SliderTheme.of(context).copyWith(
-            activeTrackColor: _primaryColor,
-            inactiveTrackColor: _primaryColor.withOpacity(0.3),
-            thumbColor: _primaryColor,
-            overlayColor: _primaryColor.withOpacity(0.2),
-            trackHeight: 4,
-          ),
-          child: Slider(
-            value: value,
-            min: min,
-            max: max,
-            onChanged: onChanged,
-          ),
+        Slider(
+          value: currentValue,
+          min: values.first,
+          max: values.last,
+          divisions: values.length - 1,
+          label: display(currentValue),
+          onChanged: (v) {
+            // Snap to nearest allowed value
+            double nearest = values.reduce((a, b) => (v - a).abs() < (v - b).abs() ? a : b);
+            onChanged(nearest);
+          },
         ),
       ],
     );

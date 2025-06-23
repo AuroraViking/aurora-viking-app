@@ -1,6 +1,5 @@
 import 'package:fl_chart/fl_chart.dart';
 import 'package:flutter/material.dart';
-import 'dart:math';
 import '../../services/auroral_power_service.dart';
 
 class AuroraPowerPoint {
@@ -15,10 +14,10 @@ class AuroraPowerChart extends StatefulWidget {
   final AuroralPowerService service;
 
   const AuroraPowerChart({
-    Key? key,
+    super.key,
     required this.data,
     required this.service,
-  }) : super(key: key);
+  });
 
   @override
   State<AuroraPowerChart> createState() => _AuroraPowerChartState();
