@@ -10,9 +10,7 @@ import '../services/user_photos_service.dart';
 import '../services/bokun_service.dart';
 import '../models/aurora_sighting.dart';
 import '../models/aurora_comment.dart';
-import '../models/user_aurora_photo.dart';
 import 'package:geolocator/geolocator.dart';
-import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -139,7 +137,7 @@ class FirebaseService {
       print('🔍 Searching Bokun for email: $email');
 
       // For now, we'll use a test booking reference - replace this with actual email lookup
-      final testBookingRef = 'aur-65391772'; // Your test booking
+      const testBookingRef = 'aur-65391772'; // Your test booking
       final bookingDetails = await BokunService.verifyBookingReference(testBookingRef);
 
       if (bookingDetails != null && bookingDetails['isValid'] == true) {
@@ -151,7 +149,7 @@ class FirebaseService {
       return null;
     } catch (e) {
       print('❌ Error verifying tour participant by email: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -172,7 +170,7 @@ class FirebaseService {
       return null;
     } catch (e) {
       print('❌ Error verifying tour participant by reference: $e');
-      throw e;
+      rethrow;
     }
   }
 
@@ -328,6 +326,12 @@ class FirebaseService {
     }
 
     try {
+      // Check if user is blocked
+      final blockedDoc = await firestore.collection('blocked_users').doc(currentUser!.uid).get();
+      if (blockedDoc.exists) {
+        throw Exception('Your account has been blocked. You cannot post new sightings.');
+      }
+
       String? photoUrl;
 
       // Upload photo if provided
@@ -433,7 +437,7 @@ class FirebaseService {
 
     // Filter by distance (simplified calculation)
     return snapshot.docs.where((doc) {
-      final data = doc.data() as Map<String, dynamic>;
+      final data = doc.data();
       final location = data['location'];
       
       // Handle both GeoPoint and Map locations
@@ -610,79 +614,6 @@ class FirebaseService {
     });
   }
 
-  // LOCAL NOTIFICATIONS
-
-  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
-
-  Future<void> initializeLocalNotifications() async {
-    const AndroidInitializationSettings initializationSettingsAndroid =
-        AndroidInitializationSettings('@mipmap/ic_launcher');
-    final InitializationSettings initializationSettings = InitializationSettings(
-      android: initializationSettingsAndroid,
-    );
-    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
-  }
-
-  Future<void> showAuroraNearbyNotification(String title, String body) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'aurora_nearby_channel',
-      'Nearby Aurora Sightings',
-      channelDescription: 'Notifications for aurora sightings near you',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: true,
-    );
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-    await flutterLocalNotificationsPlugin.show(
-      0,
-      title,
-      body,
-      platformChannelSpecifics,
-    );
-  }
-
-  Future<void> showHighActivityNotification(String title, String body) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'aurora_high_activity_channel',
-      'High Aurora Activity',
-      channelDescription: 'Notifications for high aurora activity',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: true,
-    );
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-    await flutterLocalNotificationsPlugin.show(
-      1,
-      title,
-      body,
-      platformChannelSpecifics,
-    );
-  }
-
-  Future<void> showAppUpdateNotification(String title, String body) async {
-    const AndroidNotificationDetails androidPlatformChannelSpecifics =
-        AndroidNotificationDetails(
-      'app_update_channel',
-      'App Updates',
-      channelDescription: 'Notifications for app updates',
-      importance: Importance.max,
-      priority: Priority.high,
-      showWhen: true,
-    );
-    const NotificationDetails platformChannelSpecifics =
-        NotificationDetails(android: androidPlatformChannelSpecifics);
-    await flutterLocalNotificationsPlugin.show(
-      2,
-      title,
-      body,
-      platformChannelSpecifics,
-    );
-  }
-
   // UTILITY METHODS
 
   // Calculate distance between two points (Haversine formula)
@@ -712,7 +643,7 @@ class FirebaseService {
   }) {
     final targetUserId = userId ?? currentUser?.uid;
     if (targetUserId == null) {
-      return Stream.empty();
+      return const Stream.empty();
     }
 
     return firestore
@@ -1086,67 +1017,83 @@ class FirebaseService {
     }
   }
 
-  Future<Map<String, dynamic>> getUserNotificationSettings() async {
-    if (currentUser == null) return {
-      'appUpdates': true,
-      'highActivityAlert': true,
-      'alertNearby': true,
-    };
-    final doc = await firestore.collection('users').doc(currentUser!.uid).get();
-    final data = doc.data() ?? {};
-    return {
-      'appUpdates': data['appUpdates'] ?? true,
-      'highActivityAlert': data['highActivityAlert'] ?? true,
-      'alertNearby': data['alertNearby'] ?? true,
-    };
-  }
+  // NOTIFICATION METHODS
 
-  Future<void> setUserNotificationSettings({
-    bool? auroraAlerts,
-    bool? appUpdates,
-    bool? highActivityAlert,
-    bool? alertNearby,
-  }) async {
-    if (currentUser == null) return;
-    final updates = <String, dynamic>{};
-    if (auroraAlerts != null) updates['auroraAlerts'] = auroraAlerts;
-    if (appUpdates != null) updates['appUpdates'] = appUpdates;
-    if (highActivityAlert != null) updates['highActivityAlert'] = highActivityAlert;
-    if (alertNearby != null) updates['alertNearby'] = alertNearby;
-    if (updates.isNotEmpty) {
-      await firestore.collection('users').doc(currentUser!.uid).update(updates);
+  // Check if should show nearby alert
+  Future<bool> shouldShowNearbyAlert() async {
+    try {
+      // For now, return true if user has recent sightings nearby
+      final nearbySightings = await getNearbySightings();
+      return nearbySightings.isNotEmpty;
+    } catch (e) {
+      print('Error checking nearby alert: $e');
+      return false;
     }
   }
 
-  Future<void> checkAndNotifyAppUpdate({required String latestVersion}) async {
-    if (!await shouldShowAppUpdateAlert()) return;
-    // You would fetch the current app version from package_info_plus
-    // and compare with latestVersion (from your backend or store)
-    // For demonstration, always show notification:
-    showAppUpdateNotification(
-      'App Update Available!',
-      'A new version of Aurora Viking is available. Please update for the best experience.',
-    );
-  }
-
-  Future<bool> shouldShowAppUpdateAlert() async {
-    if (currentUser == null) return true;
-    final doc = await firestore.collection('users').doc(currentUser!.uid).get();
-    final data = doc.data() ?? {};
-    return data['appUpdates'] ?? true;
-  }
-
-  Future<bool> shouldShowNearbyAlert() async {
-    if (currentUser == null) return true;
-    final doc = await firestore.collection('users').doc(currentUser!.uid).get();
-    final data = doc.data() ?? {};
-    return data['alertNearby'] ?? true;
-  }
-
+  // Check if should show high activity alert
   Future<bool> shouldShowHighActivityAlert() async {
-    if (currentUser == null) return true;
-    final doc = await firestore.collection('users').doc(currentUser!.uid).get();
-    final data = doc.data() ?? {};
-    return data['highActivityAlert'] ?? true;
+    try {
+      final recentSightings = await getRecentSightings();
+      final highIntensitySightings = recentSightings.where((s) => s.intensity >= 4).length;
+      return highIntensitySightings >= 3; // Show alert if 3+ high intensity sightings
+    } catch (e) {
+      print('Error checking high activity alert: $e');
+      return false;
+    }
+  }
+
+  // Get user notification settings
+  Future<Map<String, dynamic>> getUserNotificationSettings() async {
+    if (currentUser == null) {
+      return {
+        'nearbyAlerts': true,
+        'highActivityAlerts': true,
+        'newSightings': true,
+        'verifiedSightings': true,
+        'pushNotifications': true,
+        'emailNotifications': false,
+      };
+    }
+
+    try {
+      final doc = await firestore.collection('users').doc(currentUser!.uid).get();
+      final data = doc.data() ?? {};
+      
+      return {
+        'nearbyAlerts': data['notificationSettings']?['nearbyAlerts'] ?? true,
+        'highActivityAlerts': data['notificationSettings']?['highActivityAlerts'] ?? true,
+        'newSightings': data['notificationSettings']?['newSightings'] ?? true,
+        'verifiedSightings': data['notificationSettings']?['verifiedSightings'] ?? true,
+        'pushNotifications': data['notificationSettings']?['pushNotifications'] ?? true,
+        'emailNotifications': data['notificationSettings']?['emailNotifications'] ?? false,
+      };
+    } catch (e) {
+      print('Error getting notification settings: $e');
+      return {
+        'nearbyAlerts': true,
+        'highActivityAlerts': true,
+        'newSightings': true,
+        'verifiedSightings': true,
+        'pushNotifications': true,
+        'emailNotifications': false,
+      };
+    }
+  }
+
+  // Set user notification settings
+  Future<void> setUserNotificationSettings(Map<String, dynamic> settings) async {
+    if (currentUser == null) return;
+
+    try {
+      await firestore.collection('users').doc(currentUser!.uid).update({
+        'notificationSettings': settings,
+        'lastUpdated': FieldValue.serverTimestamp(),
+      });
+      print('✅ Notification settings updated');
+    } catch (e) {
+      print('❌ Failed to update notification settings: $e');
+      throw Exception('Failed to update notification settings');
+    }
   }
 }

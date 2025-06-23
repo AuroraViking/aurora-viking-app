@@ -11,6 +11,10 @@ service cloud.firestore {
       return isAuthenticated() && request.auth.uid == userId;
     }
 
+    function isAdmin() {
+      return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
+    }
+
     // Aurora sightings
     match /aurora_sightings/{sightingId} {
       allow read: if true;
@@ -24,7 +28,10 @@ service cloud.firestore {
          request.resource.data.diff(resource.data).affectedKeys()
            .hasOnly(['description', 'photoUrls', 'intensity']))
       );
-      allow delete: if isAuthenticated() && resource.data.userId == request.auth.uid;
+      allow delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
+      );
 
       // Comments subcollection
       match /comments/{commentId} {
@@ -73,18 +80,20 @@ service cloud.firestore {
     match /reports/{reportId} {
       allow read: if isAuthenticated();
       allow create: if isAuthenticated();
-      allow update: if isAuthenticated() && (
-        // Allow admins to update report status
-        request.resource.data.diff(resource.data).affectedKeys().hasOnly(['status']) ||
-        // Allow reporters to update their own reports
-        resource.data.userId == request.auth.uid
+      allow update, delete: if isAuthenticated() && (
+        resource.data.userId == request.auth.uid || 
+        isAdmin()
       );
-      allow delete: if isAuthenticated() && (
-        // Allow admins to delete reports
-        request.auth.token.admin == true ||
-        // Allow reporters to delete their own reports
-        resource.data.userId == request.auth.uid
-      );
+    }
+
+    // Blocked users collection — only admins can manage blocked users
+    match /blocked_users/{userId} {
+      allow read, write, delete: if isAuthenticated() && isAdmin();
+    }
+
+    // Allow users to read their own admin doc
+    match /admins/{uid} {
+      allow read: if isAuthenticated() && request.auth.uid == uid;
     }
   }
 }

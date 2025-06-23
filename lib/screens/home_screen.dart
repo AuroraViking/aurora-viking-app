@@ -10,17 +10,9 @@ import '../services/firebase_service.dart';
 import '../widgets/user_badge.dart';
 import 'tour_auth_screen.dart';
 import 'package:firebase_auth/firebase_auth.dart' as firebase_auth;
-import 'package:flutter_svg/flutter_svg.dart';
 import 'package:url_launcher/url_launcher.dart';
-import 'package:geolocator/geolocator.dart';
-import '../services/weather_service.dart';
-import '../services/light_pollution_service.dart';
-import '../services/sunrise_sunset_service.dart';
-import '../services/moon_service.dart';
-import '../widgets/forecast/bortle_map.dart';
-import '../widgets/forecast/cloud_forecast_map.dart';
-import '../services/auroral_power_service.dart';
-import '../widgets/forecast/auroral_power_chart.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'admin_reports_screen.dart'; // Add this import
 
 class HomeScreen extends StatefulWidget {
   const HomeScreen({super.key});
@@ -34,6 +26,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
   bool _showSpotAuroraFAB = true;
   bool _isInitialized = false;
   String? _errorMessage;
+  bool _isAdmin = false;
 
   // Aurora conditions for FAB visibility
   double _currentBzH = 0.0;
@@ -50,6 +43,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
     super.initState();
     _initializeAnimations();
     _initializeServices();
+    _checkAdmin();
   }
 
   void _initializeAnimations() {
@@ -88,6 +82,15 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _errorMessage = 'Failed to initialize services: $e';
       });
     }
+  }
+
+  Future<void> _checkAdmin() async {
+    final user = firebase_auth.FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+    final adminDoc = await FirebaseFirestore.instance.collection('admins').doc(user.uid).get();
+    setState(() {
+      _isAdmin = adminDoc.exists;
+    });
   }
 
   @override
@@ -143,11 +146,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return const ForecastTab();
       case 1:
         return const AuroraAlertsTab();
-      // Hide Photos and Prints tabs for app store launch
-      // case 2:
-      //   return const MyPhotosTab();
-      // case 3:
-      //   return const prints.PrintsTab();
+      case 2:
+        return const MyPhotosTab();
+      case 3:
+        return const prints.PrintsTab();
       default:
         return const ForecastTab();
     }
@@ -164,9 +166,8 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       destinations: [
         _buildNavItem(0, Icons.radar, 'Forecast'),
         _buildNavItem(1, Icons.notifications, 'Aurora Sightings'),
-        // Hide Photos and Prints tabs for app store launch
-        // _buildNavItem(2, Icons.photo_library, 'Photos'),
-        // _buildNavItem(3, Icons.print, 'Prints'),
+        _buildNavItem(2, Icons.photo_library, 'Photos'),
+        _buildNavItem(3, Icons.print, 'Prints'),
       ],
     );
   }
@@ -322,89 +323,107 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
             actions: [
-              // Removed debug button
               const Padding(
                 padding: EdgeInsets.only(right: 16),
                 child: UserBadge(),
               ),
             ],
           ),
-          body: !isAuthenticated
-              ? Center(
-            child: Column(
-              mainAxisAlignment: MainAxisAlignment.center,
-              children: [
-                const Icon(
-                  Icons.account_circle,
-                  size: 64,
-                  color: Colors.blueAccent,
-                ),
-                const SizedBox(height: 16),
-                const Text(
-                  'Welcome to Aurora Viking',
-                  style: TextStyle(
-                    color: Colors.white,
-                    fontSize: 24,
-                    fontWeight: FontWeight.bold,
-                  ),
-                ),
-                const SizedBox(height: 8),
-                const Text(
-                  'Please sign in to continue',
-                  style: TextStyle(
-                    color: Colors.white70,
-                    fontSize: 16,
-                  ),
-                ),
-                const SizedBox(height: 24),
-                ElevatedButton(
-                  onPressed: () {
-                    Navigator.push(
-                      context,
-                      MaterialPageRoute(
-                        builder: (context) => const TourAuthScreen(),
+          body: Stack(
+            children: [
+              !isAuthenticated
+                  ? Center(
+                child: Column(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    const Icon(
+                      Icons.account_circle,
+                      size: 64,
+                      color: Colors.blueAccent,
+                    ),
+                    const SizedBox(height: 16),
+                    const Text(
+                      'Welcome to Aurora Viking',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 24,
+                        fontWeight: FontWeight.bold,
                       ),
-                    );
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.blueAccent,
-                    foregroundColor: Colors.white,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 32,
-                      vertical: 16,
                     ),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(12),
+                    const SizedBox(height: 8),
+                    const Text(
+                      'Please sign in to continue',
+                      style: TextStyle(
+                        color: Colors.white70,
+                        fontSize: 16,
+                      ),
                     ),
-                  ),
-                  child: const Text(
-                    'Sign In',
-                    style: TextStyle(
-                      fontSize: 16,
-                      fontWeight: FontWeight.bold,
+                    const SizedBox(height: 24),
+                    ElevatedButton(
+                      onPressed: () {
+                        Navigator.push(
+                          context,
+                          MaterialPageRoute(
+                            builder: (context) => const TourAuthScreen(),
+                          ),
+                        );
+                      },
+                      style: ElevatedButton.styleFrom(
+                        backgroundColor: Colors.blueAccent,
+                        foregroundColor: Colors.white,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 32,
+                          vertical: 16,
+                        ),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                      child: const Text(
+                        'Sign In',
+                        style: TextStyle(
+                          fontSize: 16,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
                     ),
+                  ],
+                ),
+              )
+                  : AnimatedBuilder(
+                animation: _navigationAnimationController,
+                builder: (context, child) {
+                  return FadeTransition(
+                    opacity: _navigationAnimationController,
+                    child: SlideTransition(
+                      position: Tween<Offset>(
+                        begin: const Offset(0.0, 0.1),
+                        end: Offset.zero,
+                      ).animate(CurvedAnimation(
+                        parent: _navigationAnimationController,
+                        curve: Curves.easeOutCubic,
+                      )),
+                      child: _buildBody(),
+                    ),
+                  );
+                },
+              ),
+              if (_isAdmin)
+                Positioned(
+                  top: 40,
+                  right: 20,
+                  child: FloatingActionButton.extended(
+                    heroTag: 'adminReports',
+                    icon: Icon(Icons.admin_panel_settings),
+                    label: Text('Admin Reports'),
+                    onPressed: () {
+                      Navigator.of(context).push(
+                        MaterialPageRoute(builder: (_) => AdminReportsScreen()),
+                      );
+                    },
                   ),
                 ),
-              ],
-            ),
-          )
-              : AnimatedBuilder(
-            animation: _navigationAnimationController,
-            builder: (context, child) {
-              return FadeTransition(
-                opacity: _navigationAnimationController,
-                child: SlideTransition(
-                  position: Tween<Offset>(
-                    begin: const Offset(0.0, 0.1),
-                    end: Offset.zero,
-                  ).animate(CurvedAnimation(
-                    parent: _navigationAnimationController,
-                    curve: Curves.easeOutCubic,
-                  )),
-                  child: _buildBody(),
-                ),
-              );
-            },
+            ],
           ),
           bottomNavigationBar: isAuthenticated ? _buildNavigationBar() : null,
         );

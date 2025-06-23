@@ -36,11 +36,14 @@ class _NotificationSettingsScreenState extends State<NotificationSettingsScreen>
     bool? highActivityAlert,
     bool? alertNearby,
   }) async {
-    await _firebaseService.setUserNotificationSettings(
-      appUpdates: appUpdates,
-      highActivityAlert: highActivityAlert,
-      alertNearby: alertNearby,
-    );
+    final settings = await _firebaseService.getUserNotificationSettings();
+    
+    // Update only the changed settings
+    if (appUpdates != null) settings['appUpdates'] = appUpdates;
+    if (highActivityAlert != null) settings['highActivityAlert'] = highActivityAlert;
+    if (alertNearby != null) settings['alertNearby'] = alertNearby;
+    
+    await _firebaseService.setUserNotificationSettings(settings);
   }
 
   @override

@@ -190,13 +190,13 @@ Shared via Aurora Viking App
                   borderRadius: BorderRadius.circular(12),
                   border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
                 ),
-                child: Center(
+                child: const Center(
                   child: Row(
                     mainAxisAlignment: MainAxisAlignment.center,
                     children: [
-                      const Icon(Icons.location_on, color: Colors.tealAccent),
-                      const SizedBox(width: 8),
-                      const Text(
+                      Icon(Icons.location_on, color: Colors.tealAccent),
+                      SizedBox(width: 8),
+                      Text(
                         'Location-only post',
                         style: TextStyle(color: Colors.white, fontWeight: FontWeight.bold),
                       ),
@@ -254,16 +254,7 @@ Shared via Aurora Viking App
                 const Icon(Icons.location_on, color: Colors.white70),
                 const SizedBox(width: 8),
                 Text(
-                  widget.sighting.locationName.length > 24
-                      ? widget.sighting.locationName.substring(0, 24) + '...'
-                      : widget.sighting.locationName,
-                  style: const TextStyle(color: Colors.white70),
-                  overflow: TextOverflow.ellipsis,
-                  maxLines: 1,
-                ),
-                const SizedBox(width: 8),
-                Text(
-                  '(${widget.sighting.location.latitude.toStringAsFixed(2)}, ${widget.sighting.location.longitude.toStringAsFixed(2)})',
+                  '${widget.sighting.locationName} (${widget.sighting.location.latitude.toStringAsFixed(2)}, ${widget.sighting.location.longitude.toStringAsFixed(2)})',
                   style: const TextStyle(color: Colors.white70),
                 ),
               ],
@@ -523,21 +514,6 @@ Shared via Aurora Viking App
               title: const Text('Inappropriate Content'),
               onTap: () => _submitReport('Inappropriate Content'),
             ),
-            ListTile(
-              leading: const Icon(Icons.location_off, color: Colors.orange),
-              title: const Text('Incorrect Location'),
-              onTap: () => _submitReport('Incorrect Location'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.visibility_off, color: Colors.orange),
-              title: const Text('Not Aurora'),
-              onTap: () => _submitReport('Not Aurora'),
-            ),
-            ListTile(
-              leading: const Icon(Icons.more_horiz, color: Colors.grey),
-              title: const Text('Other'),
-              onTap: () => _submitReport('Other'),
-            ),
           ],
         ),
       ),
@@ -579,4 +555,4 @@ Shared via Aurora Viking App
       default: return Colors.grey;
     }
   }
-}
+} 
