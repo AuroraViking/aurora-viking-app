@@ -31,7 +31,7 @@ class CloudTileProvider implements TileProvider {
         return Tile(256, 256, bytes);
       }
     } catch (e) {
-      print('Error loading tile: $e');
+      // Remove all print statements for production
     }
 
     return TileProvider.noTile;
@@ -45,4 +45,4 @@ class CloudTileProvider implements TileProvider {
 
   @override
   Future<void> onTileOverlayRemoved() async {}
-} 
+}

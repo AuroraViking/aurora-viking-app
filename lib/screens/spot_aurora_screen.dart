@@ -105,21 +105,21 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
               textAlign: TextAlign.center,
             ),
             const SizedBox(height: 32),
-            Row(
-              mainAxisAlignment: MainAxisAlignment.center,
+            Wrap(
+              spacing: 24,
+              runSpacing: 24,
+              alignment: WrapAlignment.center,
               children: [
                 _buildOptionButton(
                   icon: Icons.camera_alt,
                   label: 'Take Photo',
                   onTap: _openCamera,
                 ),
-                const SizedBox(width: 24),
                 _buildOptionButton(
                   icon: Icons.upload_file,
                   label: 'Upload Photo',
                   onTap: _uploadImage,
                 ),
-                const SizedBox(width: 24),
                 _buildOptionButton(
                   icon: Icons.location_on,
                   label: 'Just Location',
@@ -144,7 +144,7 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
       onTap: onTap,
       borderRadius: BorderRadius.circular(16),
       child: Container(
-        width: 140,
+        width: MediaQuery.of(context).size.width < 400 ? 100 : 120, // Adaptive width
         padding: const EdgeInsets.all(16),
         decoration: BoxDecoration(
           color: Colors.white.withOpacity(0.1),
@@ -164,6 +164,8 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
                 fontWeight: FontWeight.w500,
               ),
               textAlign: TextAlign.center,
+              overflow: TextOverflow.ellipsis,
+              maxLines: 2,
             ),
           ],
         ),

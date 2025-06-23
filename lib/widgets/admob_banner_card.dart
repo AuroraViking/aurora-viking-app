@@ -13,12 +13,12 @@ class _AdMobBannerCardState extends State<AdMobBannerCard> {
   BannerAd? _bannerAd;
   bool _isLoaded = false;
 
-  static const String _testAdUnitId = 'ca-app-pub-3940256099942544/6300978111';
+  static const String _productionAdUnitId = 'ca-app-pub-4178524691208335/6625766838';
 
   @override
   void initState() {
     super.initState();
-    final adUnitId = widget.adUnitId ?? _testAdUnitId;
+    final adUnitId = widget.adUnitId ?? _productionAdUnitId;
     _bannerAd = BannerAd(
       adUnitId: adUnitId,
       size: AdSize.banner,

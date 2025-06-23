@@ -11,6 +11,7 @@ import '../services/bokun_service.dart';
 import '../models/aurora_sighting.dart';
 import '../models/aurora_comment.dart';
 import 'package:geolocator/geolocator.dart';
+import '../services/notification_service.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -35,7 +36,6 @@ class FirebaseService {
   static Future<void> initialize() async {
     await Firebase.initializeApp();
     await FirebaseService()._setupMessaging();
-    print('✅ Firebase initialized');
   }
 
   // AUTHENTICATION METHODS
@@ -54,7 +54,6 @@ class FirebaseService {
 
       return credential;
     } catch (e) {
-      print('❌ Registration failed: $e');
       return null;
     }
   }
@@ -77,7 +76,6 @@ class FirebaseService {
 
       return credential;
     } catch (e) {
-      print('❌ Sign in failed: $e');
       return null;
     }
   }
@@ -86,9 +84,8 @@ class FirebaseService {
   Future<void> signOut() async {
     try {
       await auth.signOut();
-      print('✅ Signed out successfully');
     } catch (e) {
-      print('❌ Sign out failed: $e');
+      // Handle sign out error
     }
   }
 
@@ -113,9 +110,8 @@ class FirebaseService {
       };
 
       await firestore.collection('users').doc(user.uid).set(userData, SetOptions(merge: true));
-      print('✅ User profile created/updated');
     } catch (e) {
-      print('❌ Failed to create user profile: $e');
+      // Handle user profile creation error
     }
   }
 
@@ -124,8 +120,6 @@ class FirebaseService {
   // Verify tour participant by email (for compatibility with your existing screen)
   Future<Map<String, dynamic>?> verifyTourParticipant(String email) async {
     try {
-      print('🔍 Verifying tour participant by email: $email');
-
       // First check if we have any verified bookings in Firestore that match this email
       final verifiedBookings = await _checkFirestoreForVerifiedBooking(email);
       if (verifiedBookings != null) {
@@ -134,21 +128,9 @@ class FirebaseService {
 
       // If not found in Firestore, try to find in Bokun by searching all bookings
       // Note: This is a fallback - in real implementation you'd have email-to-booking mapping
-      print('🔍 Searching Bokun for email: $email');
-
-      // For now, we'll use a test booking reference - replace this with actual email lookup
-      const testBookingRef = 'aur-65391772'; // Your test booking
-      final bookingDetails = await BokunService.verifyBookingReference(testBookingRef);
-
-      if (bookingDetails != null && bookingDetails['isValid'] == true) {
-        // Store the verified booking in Firestore
-        await _storeVerifiedBooking(email, testBookingRef, bookingDetails);
-        return bookingDetails;
-      }
 
       return null;
     } catch (e) {
-      print('❌ Error verifying tour participant by email: $e');
       rethrow;
     }
   }
@@ -156,8 +138,6 @@ class FirebaseService {
   // Verify tour participant by booking reference
   Future<Map<String, dynamic>?> verifyTourParticipantByReference(String reference) async {
     try {
-      print('🔍 Verifying tour participant by reference: $reference');
-
       // First verify the booking exists in Bokun
       final bookingDetails = await BokunService.verifyBookingReference(reference);
 
@@ -169,7 +149,6 @@ class FirebaseService {
 
       return null;
     } catch (e) {
-      print('❌ Error verifying tour participant by reference: $e');
       rethrow;
     }
   }
@@ -186,11 +165,10 @@ class FirebaseService {
 
       if (snapshot.docs.isNotEmpty) {
         final data = snapshot.docs.first.data();
-        print('✅ Found verified booking in Firestore for email: $email');
         return data;
       }
     } catch (e) {
-      print('❌ Error checking Firestore for verified booking: $e');
+      // Handle error checking Firestore
     }
     return null;
   }
@@ -221,10 +199,8 @@ class FirebaseService {
           'tourParticipant': true,
         });
       }
-
-      print('✅ Stored verified booking for email: $email');
     } catch (e) {
-      print('❌ Error storing verified booking: $e');
+      // Handle error storing verified booking
     }
   }
 
@@ -260,10 +236,8 @@ class FirebaseService {
           'tourParticipant': true,
         });
       }
-
-      print('✅ Stored verified booking for reference: $reference');
     } catch (e) {
-      print('❌ Error storing verified booking by reference: $e');
+      // Handle error storing verified booking by reference
     }
   }
 
@@ -275,7 +249,6 @@ class FirebaseService {
       final doc = await firestore.collection('users').doc(currentUser!.uid).get();
       return doc.data()?['userType'] ?? 'aurora_user';
     } catch (e) {
-      print('❌ Failed to get user type: $e');
       return 'aurora_user';
     }
   }
@@ -288,7 +261,6 @@ class FirebaseService {
       final doc = await firestore.collection('users').doc(currentUser!.uid).get();
       return doc.data()?['tourParticipant'] ?? false;
     } catch (e) {
-      print('❌ Failed to check tour participant status: $e');
       return false;
     }
   }
@@ -301,7 +273,6 @@ class FirebaseService {
       final doc = await firestore.collection('users').doc(currentUser!.uid).get();
       return doc.data()?['bookingDetails'];
     } catch (e) {
-      print('❌ Failed to get user verified booking: $e');
       return null;
     }
   }
@@ -322,33 +293,17 @@ class FirebaseService {
     required double solarWindSpeed,
   }) async {
     if (currentUser == null) {
-      print('❌ User not authenticated');
       return null;
     }
 
     try {
-      print('🔍 Starting aurora sighting submission...');
-      print('   User: ${currentUser!.uid}');
-      print('   Location: $latitude, $longitude');
-      print('   Photo provided: ${photoFile != null || photoBytes != null}');
-      
-      // Check if user is blocked
-      final blockedDoc = await firestore.collection('blocked_users').doc(currentUser!.uid).get();
-      if (blockedDoc.exists) {
-        print('❌ User is blocked: ${currentUser!.uid}');
-        throw Exception('Your account has been blocked. You cannot post new sightings.');
-      }
-      print('✅ User is not blocked');
-
       String? photoUrl;
 
       // Upload photo if provided
       if (photoFile != null || photoBytes != null) {
-        print('📸 Starting photo upload...');
         photoUrl = await _uploadAuroraPhoto(photoFile, photoBytes);
-        print('📸 Photo upload result: ${photoUrl != null ? 'Success' : 'Failed'}');
-        if (photoUrl != null) {
-          print('📸 Photo URL: $photoUrl');
+        if (photoUrl == null) {
+          throw Exception('Photo upload failed');
         }
       }
 
@@ -379,11 +334,8 @@ class FirebaseService {
           'verificationCount': 0,
         });
       }
-      
-      print('👤 User display name: $userDisplayName');
 
       // Create sighting document
-      print('📝 Creating sighting document...');
       final sightingRef = await firestore.collection('aurora_sightings').add({
         'userId': currentUser!.uid,
         'userName': userDisplayName,
@@ -404,23 +356,18 @@ class FirebaseService {
         'reportCount': 0,
       });
 
-      print('✅ Sighting document created with ID: ${sightingRef.id}');
-
       // Update user's profile with location and sighting count
       if (isAuthenticated) {
-        print('👤 Updating user profile...');
         await firestore.collection('users').doc(currentUser!.uid).update({
           'auroraSpottingCount': FieldValue.increment(1),
           'lastActive': FieldValue.serverTimestamp(),
           'location': GeoPoint(latitude, longitude),
           'lastLocationName': address,
         });
-        print('✅ User profile updated');
       }
 
       // Also save as user photo if photo was uploaded
       if (photoUrl != null) {
-        print('📸 Saving as user photo...');
         await UserPhotosService.saveUserPhoto(
           sightingId: sightingRef.id,
           photoUrl: photoUrl,
@@ -437,15 +384,10 @@ class FirebaseService {
             },
           },
         );
-        print('✅ User photo saved');
       }
 
-      print('🎉 Aurora sighting submission completed successfully');
       return sightingRef.id;
     } catch (e) {
-      print('❌ Failed to submit aurora sighting: $e');
-      print('❌ Error type: ${e.runtimeType}');
-      print('❌ Error details: $e');
       rethrow;
     }
   }
@@ -545,7 +487,6 @@ class FirebaseService {
 
       return true;
     } catch (e) {
-      print('❌ Failed to verify sighting: $e');
       return false;
     }
   }
@@ -555,45 +496,23 @@ class FirebaseService {
   // Upload aurora photo
   Future<String?> _uploadAuroraPhoto(File? file, Uint8List? bytes) async {
     try {
-      print('📸 Starting photo upload...');
-      print('   File provided: ${file != null}');
-      print('   Bytes provided: ${bytes != null}');
-      
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'aurora_${currentUser!.uid}_$timestamp.jpg';
       final ref = storage.ref().child('aurora_photos/$fileName');
-      
-      print('📸 Upload path: aurora_photos/$fileName');
 
       UploadTask uploadTask;
       if (file != null) {
-        print('📸 Using file upload');
-        print('   File path: ${file.path}');
-        print('   File exists: ${await file.exists()}');
-        print('   File size: ${await file.length()} bytes');
         uploadTask = ref.putFile(file);
       } else if (bytes != null) {
-        print('📸 Using bytes upload');
-        print('   Bytes length: ${bytes.length}');
         uploadTask = ref.putData(bytes);
       } else {
-        print('❌ No file or bytes provided');
         return null;
       }
 
-      print('📸 Upload task started, waiting for completion...');
       final snapshot = await uploadTask;
-      print('📸 Upload completed');
-      print('   Bytes transferred: ${snapshot.bytesTransferred}');
-      print('   Total bytes: ${snapshot.totalBytes}');
-      
       final downloadUrl = await snapshot.ref.getDownloadURL();
-      print('📸 Download URL obtained: $downloadUrl');
       return downloadUrl;
     } catch (e) {
-      print('❌ Failed to upload photo: $e');
-      print('❌ Error type: ${e.runtimeType}');
-      print('❌ Error details: $e');
       return null;
     }
   }
@@ -610,7 +529,6 @@ class FirebaseService {
       final snapshot = await uploadTask;
       return await snapshot.ref.getDownloadURL();
     } catch (e) {
-      print('❌ Failed to upload tour photo: $e');
       return null;
     }
   }
@@ -629,7 +547,6 @@ class FirebaseService {
 
       return urls;
     } catch (e) {
-      print('❌ Failed to get tour photos: $e');
       return [];
     }
   }
@@ -647,16 +564,14 @@ class FirebaseService {
     );
 
     if (settings.authorizationStatus == AuthorizationStatus.authorized) {
-      print('✅ User granted permission for notifications');
+      // Permission granted
     }
 
     // Get FCM token
     final token = await messaging.getToken();
-    print('📱 FCM Token: $token');
 
     // Handle foreground messages
     FirebaseMessaging.onMessage.listen((RemoteMessage message) {
-      print('📨 Received foreground message: ${message.notification?.title}');
       // Handle the message (show local notification)
     });
   }
@@ -664,7 +579,6 @@ class FirebaseService {
   // Subscribe to aurora alerts for location
   Future<void> subscribeToAuroraAlerts(String locationKey) async {
     await messaging.subscribeToTopic('aurora_alerts_$locationKey');
-    print('🔔 Subscribed to aurora alerts for $locationKey');
   }
 
   // Send aurora alert to topic
@@ -749,9 +663,8 @@ class FirebaseService {
         'userType': userType,
         'lastActive': FieldValue.serverTimestamp(),
       });
-      print('✅ User type updated to: $userType');
     } catch (e) {
-      print('❌ Failed to update user type: $e');
+      // Handle user type update error
     }
   }
 
@@ -767,7 +680,6 @@ class FirebaseService {
         'verifications': data['verificationCount'] ?? 0,
       };
     } catch (e) {
-      print('❌ Failed to get user stats: $e');
       return {'sightings': 0, 'verifications': 0};
     }
   }
@@ -791,7 +703,6 @@ class FirebaseService {
       final doc = await firestore.collection('users').doc(currentUser!.uid).get();
       return doc.data()?['profilePictureUrl'];
     } catch (e) {
-      print('❌ Failed to get profile picture URL: $e');
       return null;
     }
   }
@@ -809,7 +720,6 @@ class FirebaseService {
           .map((doc) => AuroraComment.fromFirestore(doc))
           .toList();
     } catch (e) {
-      print('Error getting comments: $e');
       return [];
     }
   }
@@ -857,7 +767,6 @@ class FirebaseService {
         });
       });
     } catch (e) {
-      print('Error adding comment: $e');
       rethrow;
     }
   }
@@ -867,17 +776,13 @@ class FirebaseService {
       final user = currentUser;
       if (user == null) throw Exception('User not authenticated');
 
-      print('Getting nearby sightings for user: ${user.uid}');
-
       // Get user's location from their last sighting or profile
       final userDoc = await firestore.collection('users').doc(user.uid).get();
       final userLocation = userDoc.data()?['location'];
-      print('User location from profile: $userLocation');
 
       double latitude, longitude;
 
       if (userLocation == null) {
-        print('No location in user profile, checking last sighting');
         // If no location in profile, try to get from last sighting
         final lastSighting = await firestore
             .collection('aurora_sightings')
@@ -887,7 +792,6 @@ class FirebaseService {
             .get();
 
         if (lastSighting.docs.isEmpty) {
-          print('No last sighting found, getting current device location');
           // If no last sighting, get current device location
           try {
             final position = await Geolocator.getCurrentPosition(
@@ -896,34 +800,26 @@ class FirebaseService {
             );
             latitude = position.latitude;
             longitude = position.longitude;
-            print('Got current device location: $latitude, $longitude');
             
             // Update user's profile with current location
             await firestore.collection('users').doc(user.uid).update({
               'location': GeoPoint(latitude, longitude),
               'lastLocationUpdate': FieldValue.serverTimestamp(),
             });
-            print('Updated user profile with current location');
           } catch (e) {
-            print('Error getting current location: $e');
             return [];
           }
         } else {
-          print('Found last sighting, using its location');
           final sightingData = lastSighting.docs.first.data();
           final location = sightingData['location'];
-          print('Last sighting location data: $location');
 
           if (location is GeoPoint) {
             latitude = location.latitude;
             longitude = location.longitude;
-            print('Location is GeoPoint: $latitude, $longitude');
           } else if (location is Map<String, dynamic>) {
             latitude = location['latitude']?.toDouble() ?? 0.0;
             longitude = location['longitude']?.toDouble() ?? 0.0;
-            print('Location is Map: $latitude, $longitude');
           } else {
-            print('Invalid location type: ${location.runtimeType}');
             return [];
           }
         }
@@ -931,13 +827,10 @@ class FirebaseService {
         if (userLocation is GeoPoint) {
           latitude = userLocation.latitude;
           longitude = userLocation.longitude;
-          print('Using GeoPoint location from profile: $latitude, $longitude');
         } else if (userLocation is Map<String, dynamic>) {
           latitude = userLocation['latitude']?.toDouble() ?? 0.0;
           longitude = userLocation['longitude']?.toDouble() ?? 0.0;
-          print('Using Map location from profile: $latitude, $longitude');
         } else {
-          print('Invalid user location type: ${userLocation.runtimeType}');
           return [];
         }
       }
@@ -945,7 +838,6 @@ class FirebaseService {
       // Get all recent sightings and filter by distance
       final now = DateTime.now();
       final twentyFourHoursAgo = now.subtract(const Duration(hours: 24));
-      print('Fetching sightings from last 24 hours');
       
       final snapshot = await firestore
           .collection('aurora_sightings')
@@ -953,8 +845,6 @@ class FirebaseService {
           .orderBy('timestamp', descending: true)
           .limit(100)
           .get();
-
-      print('Found ${snapshot.docs.length} recent sightings');
 
       final sightings = snapshot.docs
           .map((doc) => AuroraSighting.fromFirestore(doc))
@@ -964,58 +854,44 @@ class FirebaseService {
               sighting.location.latitude, sighting.location.longitude,
             );
             final isNearby = distance <= 100; // 100km radius
-            print('Sighting ${sighting.id} distance: ${distance.toStringAsFixed(2)}km, isNearby: $isNearby');
             return isNearby;
           })
           .toList();
 
-      print('Found ${sightings.length} nearby sightings');
       return sightings;
     } catch (e) {
-      print('Error getting nearby sightings: $e');
       return [];
     }
   }
 
   Future<Map<String, dynamic>> confirmAuroraSighting(String sightingId) async {
-    print('confirmAuroraSighting called for sighting: $sightingId');
     try {
       final user = currentUser;
       if (user == null) {
-        print('User not authenticated');
         throw Exception('User not authenticated');
       }
-      print('Current user: ${user.uid}');
 
       final sightingRef = firestore.collection('aurora_sightings').doc(sightingId);
-      print('Getting sighting document...');
       
       return await firestore.runTransaction((transaction) async {
         final sightingDoc = await transaction.get(sightingRef);
         if (!sightingDoc.exists) {
-          print('Sighting not found');
           throw Exception('Sighting not found');
         }
 
         final data = sightingDoc.data() as Map<String, dynamic>;
         final verifications = List<String>.from(data['verifications'] ?? []);
         final isLiked = verifications.contains(user.uid);
-        print('Current verifications: $verifications');
-        print('Is already liked: $isLiked');
 
         if (isLiked) {
           verifications.remove(user.uid);
-          print('Removing user from verifications');
         } else {
           verifications.add(user.uid);
-          print('Adding user to verifications');
         }
 
         final confirmations = verifications.length;
-        print('New confirmation count: $confirmations');
 
         // Update the document with all necessary fields
-        print('Updating sighting document...');
         transaction.update(sightingRef, {
           'verifications': verifications,
           'confirmations': confirmations,
@@ -1025,7 +901,6 @@ class FirebaseService {
 
         // Also update the user's verification count
         if (isAuthenticated) {
-          print('Updating user verification count...');
           final userRef = firestore.collection('users').doc(user.uid);
           transaction.update(userRef, {
             'verificationCount': FieldValue.increment(isLiked ? -1 : 1),
@@ -1039,11 +914,9 @@ class FirebaseService {
           'confirmations': confirmations,
           'verifications': verifications,
         };
-        print('Transaction completed with result: $result');
         return result;
       });
     } catch (e) {
-      print('Error confirming sighting: $e');
       rethrow;
     }
   }
@@ -1064,7 +937,6 @@ class FirebaseService {
           .map((doc) => AuroraSighting.fromFirestore(doc))
           .toList();
     } catch (e) {
-      print('Error getting recent sightings: $e');
       return [];
     }
   }
@@ -1083,6 +955,9 @@ class FirebaseService {
     try {
       final docRef = await firestore.collection('aurora_sightings').add(sighting.toFirestore());
       sighting.id = docRef.id;
+      
+      // Cloud Function will automatically handle notifications
+      // No need to call local notification service here
     } catch (e) {
       throw Exception('Failed to add aurora sighting: $e');
     }
@@ -1097,7 +972,6 @@ class FirebaseService {
       final nearbySightings = await getNearbySightings();
       return nearbySightings.isNotEmpty;
     } catch (e) {
-      print('Error checking nearby alert: $e');
       return false;
     }
   }
@@ -1109,7 +983,6 @@ class FirebaseService {
       final highIntensitySightings = recentSightings.where((s) => s.intensity >= 4).length;
       return highIntensitySightings >= 3; // Show alert if 3+ high intensity sightings
     } catch (e) {
-      print('Error checking high activity alert: $e');
       return false;
     }
   }
@@ -1118,12 +991,10 @@ class FirebaseService {
   Future<Map<String, dynamic>> getUserNotificationSettings() async {
     if (currentUser == null) {
       return {
-        'nearbyAlerts': true,
-        'highActivityAlerts': true,
-        'newSightings': true,
-        'verifiedSightings': true,
-        'pushNotifications': true,
-        'emailNotifications': false,
+        'appUpdates': true,
+        'highActivityAlert': true,
+        'alertNearby': true,
+        'spaceWeatherAlert': true,
       };
     }
 
@@ -1132,22 +1003,17 @@ class FirebaseService {
       final data = doc.data() ?? {};
       
       return {
-        'nearbyAlerts': data['notificationSettings']?['nearbyAlerts'] ?? true,
-        'highActivityAlerts': data['notificationSettings']?['highActivityAlerts'] ?? true,
-        'newSightings': data['notificationSettings']?['newSightings'] ?? true,
-        'verifiedSightings': data['notificationSettings']?['verifiedSightings'] ?? true,
-        'pushNotifications': data['notificationSettings']?['pushNotifications'] ?? true,
-        'emailNotifications': data['notificationSettings']?['emailNotifications'] ?? false,
+        'appUpdates': data['notificationSettings']?['appUpdates'] ?? true,
+        'highActivityAlert': data['notificationSettings']?['highActivityAlert'] ?? true,
+        'alertNearby': data['notificationSettings']?['alertNearby'] ?? true,
+        'spaceWeatherAlert': data['notificationSettings']?['spaceWeatherAlert'] ?? true,
       };
     } catch (e) {
-      print('Error getting notification settings: $e');
       return {
-        'nearbyAlerts': true,
-        'highActivityAlerts': true,
-        'newSightings': true,
-        'verifiedSightings': true,
-        'pushNotifications': true,
-        'emailNotifications': false,
+        'appUpdates': true,
+        'highActivityAlert': true,
+        'alertNearby': true,
+        'spaceWeatherAlert': true,
       };
     }
   }
@@ -1161,9 +1027,7 @@ class FirebaseService {
         'notificationSettings': settings,
         'lastUpdated': FieldValue.serverTimestamp(),
       });
-      print('✅ Notification settings updated');
     } catch (e) {
-      print('❌ Failed to update notification settings: $e');
       throw Exception('Failed to update notification settings');
     }
   }
@@ -1173,9 +1037,38 @@ class FirebaseService {
     try {
       // Force a fresh read from Firestore by getting the document
       await firestore.collection('blocked_users').doc(userId).get();
-      print('✅ Block cache cleared for user: $userId');
     } catch (e) {
-      print('❌ Failed to clear block cache: $e');
+      // Handle error clearing block cache
+    }
+  }
+
+  // Check for high activity and trigger notifications
+  Future<void> checkAndNotifyHighActivity() async {
+    try {
+      final recentSightings = await getRecentSightings();
+      final oneHourAgo = DateTime.now().subtract(const Duration(hours: 1));
+      
+      // Count sightings in the last hour
+      final recentCount = recentSightings.where((s) => s.timestamp.isAfter(oneHourAgo)).length;
+      
+      if (recentCount >= 5) { // Trigger if 5+ sightings in last hour
+        // Get the most common location
+        final locationCounts = <String, int>{};
+        for (final sighting in recentSightings.where((s) => s.timestamp.isAfter(oneHourAgo))) {
+          locationCounts[sighting.locationName] = (locationCounts[sighting.locationName] ?? 0) + 1;
+        }
+        
+        final mostCommonLocation = locationCounts.entries
+            .reduce((a, b) => a.value > b.value ? a : b)
+            .key;
+        
+        await NotificationService.notifyHighActivity(
+          sightingCount: recentCount,
+          location: mostCommonLocation,
+        );
+      }
+    } catch (e) {
+      // Handle error checking high activity
     }
   }
 }

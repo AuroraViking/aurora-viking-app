@@ -3,32 +3,24 @@ import 'package:flutter/material.dart';
 import 'package:firebase_core/firebase_core.dart';
 import 'package:supabase_flutter/supabase_flutter.dart';
 import 'package:flutter_dotenv/flutter_dotenv.dart';
-import 'package:google_mobile_ads/google_mobile_ads.dart';
 import 'services/firebase_service.dart';
+import 'services/notification_service.dart';
 import 'screens/home_screen.dart';
 import 'services/config_service.dart';
 
 void main() async {
   WidgetsFlutterBinding.ensureInitialized();
 
-  // Initialize AdMob
-  await MobileAds.instance.initialize();
-
   // 🔑 Load environment variables FIRST
   try {
     await dotenv.load(fileName: ".env");
-    print('✅ Environment variables loaded successfully');
 
     // Validate required environment variables
     _validateEnvironmentVariables();
 
   } catch (e) {
-    print('❌ CRITICAL ERROR: Could not load .env file: $e');
-    print('📋 Make sure you have a .env file in your project root with all required keys');
-    print('📄 Copy .env.example to .env and fill in your API keys');
-
     // Show error dialog and don't continue without environment variables
-    runApp(_ErrorApp(error: 'Environment configuration missing. Please check your .env file.'));
+    runApp(const _ErrorApp(error: 'Environment configuration missing. Please check your .env file.'));
     return;
   }
 
@@ -38,22 +30,18 @@ void main() async {
   try {
     // Initialize ConfigService first
     await ConfigService.initialize();
-    print('✅ ConfigService initialized successfully');
 
     // Initialize Supabase with environment variables
     try {
       final supabaseUrl = dotenv.env['SUPABASE_URL']!;
       final supabaseAnonKey = dotenv.env['SUPABASE_ANON_KEY']!;
 
-      print('🗄️ Initializing Supabase...');
       await Supabase.initialize(
         url: supabaseUrl,
         anonKey: supabaseAnonKey,
       );
-      print('✅ Supabase initialized successfully');
       supabaseInitialized = true;
     } catch (supabaseError) {
-      print('❌ Error initializing Supabase: $supabaseError');
       // Continue app execution even if Supabase fails
     }
 
@@ -65,7 +53,6 @@ void main() async {
       final firebaseProjectId = dotenv.env['FIREBASE_PROJECT_ID']!;
       final firebaseStorageBucket = dotenv.env['FIREBASE_STORAGE_BUCKET']!;
 
-      print('🔥 Initializing Firebase...');
       await Firebase.initializeApp(
         options: FirebaseOptions(
           apiKey: firebaseApiKey,
@@ -75,25 +62,23 @@ void main() async {
           storageBucket: firebaseStorageBucket,
         ),
       );
-      print('✅ Firebase initialized successfully');
       firebaseInitialized = true;
 
       // Initialize your Firebase service
       await FirebaseService.initialize();
-      print('✅ FirebaseService initialized successfully');
+
+      // Initialize notification service
+      await NotificationService.initialize();
+
+      // Start location updates for push notifications
+      NotificationService.startLocationUpdates();
     } catch (firebaseError) {
-      print('❌ Error initializing Firebase: $firebaseError');
       // Continue app execution even if Firebase fails
     }
 
   } catch (e) {
-    print('❌ Error during initialization: $e');
     // Show error but continue with limited functionality
   }
-
-  print('🚀 Starting Aurora Viking App...');
-  print('   Firebase: ${firebaseInitialized ? "✅" : "❌"}');
-  print('   Supabase: ${supabaseInitialized ? "✅" : "❌"}');
 
   runApp(MyApp(
     firebaseInitialized: firebaseInitialized,
@@ -127,34 +112,40 @@ void _validateEnvironmentVariables() {
   }
 
   if (missingKeys.isNotEmpty) {
+    // ignore: avoid_print
     print('❌ MISSING ENVIRONMENT VARIABLES:');
     for (String key in missingKeys) {
+      // ignore: avoid_print
       print('   • $key');
     }
   }
 
   if (emptyKeys.isNotEmpty) {
+    // ignore: avoid_print
     print('⚠️ PLACEHOLDER VALUES DETECTED:');
     for (String key in emptyKeys) {
+      // ignore: avoid_print
       print('   • $key: "${dotenv.env[key]}"');
     }
   }
 
   if (missingKeys.isNotEmpty || emptyKeys.isNotEmpty) {
+    // ignore: avoid_print
     print('📋 Please update your .env file with real API keys');
+    // ignore: avoid_print
     print('📄 Copy .env.example to .env and fill in your values');
     throw Exception('Environment variables not properly configured');
   }
 
-  print('✅ All required environment variables are present and valid');
-
   // Debug info (remove in production)
+  // ignore: avoid_print
   print('🔧 Environment loaded:');
   for (String key in requiredKeys) {
     final value = dotenv.env[key]!;
     final masked = value.length > 10
         ? '${value.substring(0, 6)}...${value.substring(value.length - 4)}'
         : '***';
+    // ignore: avoid_print
     print('   $key: $masked');
   }
 }
@@ -188,10 +179,9 @@ class MyApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        colorScheme: ColorScheme.light(
+        colorScheme: const ColorScheme.light(
           primary: Colors.tealAccent,
           secondary: Colors.cyanAccent,
-          background: Colors.white,
           surface: Colors.white,
           onPrimary: Colors.black,
           onSecondary: Colors.black,
@@ -213,10 +203,9 @@ class MyApp extends StatelessWidget {
             borderRadius: BorderRadius.circular(12),
           ),
         ),
-        colorScheme: ColorScheme.dark(
+        colorScheme: const ColorScheme.dark(
           primary: Colors.tealAccent,
           secondary: Colors.cyanAccent,
-          background: Colors.black,
           surface: Colors.black,
           onPrimary: Colors.black,
           onSecondary: Colors.black,
@@ -233,7 +222,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: HomeScreen(),
+      home: const HomeScreen(),
       debugShowCheckedModeBanner: false,
     );
   }

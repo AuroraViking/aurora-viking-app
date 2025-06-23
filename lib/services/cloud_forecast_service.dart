@@ -28,7 +28,6 @@ class CloudForecastService {
         if (retryCount < 3) {
           // Exponential backoff: 1s, 2s, 4s
           final backoff = Duration(seconds: 1 << retryCount);
-          print('Rate limited, retrying in ${backoff.inSeconds} seconds...');
           await Future.delayed(backoff);
           return _makeRequest(url, retryCount: retryCount + 1);
         }
@@ -43,7 +42,6 @@ class CloudForecastService {
     } catch (e) {
       if (retryCount < 3 && e.toString().contains('429')) {
         final backoff = Duration(seconds: 1 << retryCount);
-        print('Request failed, retrying in ${backoff.inSeconds} seconds...');
         await Future.delayed(backoff);
         return _makeRequest(url, retryCount: retryCount + 1);
       }
@@ -108,4 +106,4 @@ class CloudForecastService {
   void dispose() {
     _client.close();
   }
-} 
+}

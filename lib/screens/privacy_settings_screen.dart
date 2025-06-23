@@ -70,37 +70,226 @@ class _PrivacySettingsScreenState extends State<PrivacySettingsScreen> {
   Widget build(BuildContext context) {
     if (_loading) {
       return const Scaffold(
-        body: Center(child: CircularProgressIndicator()),
+        backgroundColor: Color(0xFF0A0F1C),
+        body: Center(child: CircularProgressIndicator(color: Colors.tealAccent)),
       );
     }
     return Scaffold(
+      backgroundColor: const Color(0xFF0A0F1C),
       appBar: AppBar(
-        title: const Text('Privacy Settings'),
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        title: const Text(
+          'Privacy Settings',
+          style: TextStyle(color: Colors.white),
+        ),
+        leading: IconButton(
+          icon: const Icon(Icons.arrow_back, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
       ),
       body: ListView(
+        padding: const EdgeInsets.all(20),
         children: [
-          SwitchListTile(
-            title: const Text('Show my sightings to others'),
+          // Header
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              gradient: LinearGradient(
+                begin: Alignment.topCenter,
+                end: Alignment.bottomCenter,
+                colors: [
+                  Colors.purpleAccent.withOpacity(0.1),
+                  Colors.transparent,
+                ],
+              ),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.purpleAccent.withOpacity(0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.privacy_tip, color: Colors.purpleAccent, size: 28),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Privacy Preferences',
+                      style: TextStyle(
+                        color: Colors.white,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Control how your information is shared with others',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.7),
+                    fontSize: 14,
+                  ),
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 24),
+          
+          // Privacy options
+          _buildPrivacyOption(
+            title: 'Show my sightings to others',
+            subtitle: 'Allow other users to see your aurora sightings',
+            icon: Icons.visibility,
             value: showSightings,
             onChanged: (val) async {
               setState(() => showSightings = val);
               await _updateSetting(showSightings: val);
             },
           ),
-          SwitchListTile(
-            title: const Text('Allow comments on my sightings'),
+          const SizedBox(height: 16),
+          
+          _buildPrivacyOption(
+            title: 'Allow comments on my sightings',
+            subtitle: 'Let other users comment on your aurora sightings',
+            icon: Icons.comment,
             value: allowComments,
             onChanged: (val) async {
               setState(() => allowComments = val);
               await _updateSetting(allowComments: val);
             },
           ),
-          const Divider(),
-          ListTile(
-            title: const Text('Delete my account', style: TextStyle(color: Colors.red)),
-            onTap: _deleteAccount,
+          const SizedBox(height: 32),
+          
+          // Danger zone
+          Container(
+            padding: const EdgeInsets.all(20),
+            decoration: BoxDecoration(
+              color: Colors.red.withOpacity(0.1),
+              borderRadius: BorderRadius.circular(16),
+              border: Border.all(color: Colors.red.withOpacity(0.3)),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    Icon(Icons.warning, color: Colors.red, size: 28),
+                    const SizedBox(width: 12),
+                    const Text(
+                      'Danger Zone',
+                      style: TextStyle(
+                        color: Colors.red,
+                        fontSize: 20,
+                        fontWeight: FontWeight.bold,
+                      ),
+                    ),
+                  ],
+                ),
+                const SizedBox(height: 16),
+                _buildDangerOption(
+                  title: 'Delete my account',
+                  subtitle: 'Permanently delete your account and all data',
+                  icon: Icons.delete_forever,
+                  onTap: _deleteAccount,
+                ),
+              ],
+            ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildPrivacyOption({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required bool value,
+    required ValueChanged<bool> onChanged,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: const Color(0xFF1A1F2E),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.purpleAccent.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: SwitchListTile(
+        title: Row(
+          children: [
+            Icon(icon, color: Colors.purpleAccent, size: 24),
+            const SizedBox(width: 12),
+            Expanded(
+              child: Text(
+                title,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 16,
+                  fontWeight: FontWeight.w600,
+                ),
+              ),
+            ),
+          ],
+        ),
+        subtitle: Padding(
+          padding: const EdgeInsets.only(left: 36),
+          child: Text(
+            subtitle,
+            style: TextStyle(
+              color: Colors.white.withOpacity(0.7),
+              fontSize: 14,
+            ),
+          ),
+        ),
+        value: value,
+        onChanged: onChanged,
+        activeColor: Colors.purpleAccent,
+        inactiveThumbColor: Colors.grey,
+        inactiveTrackColor: Colors.grey.withOpacity(0.3),
+      ),
+    );
+  }
+
+  Widget _buildDangerOption({
+    required String title,
+    required String subtitle,
+    required IconData icon,
+    required VoidCallback onTap,
+  }) {
+    return Container(
+      decoration: BoxDecoration(
+        color: Colors.red.withOpacity(0.1),
+        borderRadius: BorderRadius.circular(16),
+        border: Border.all(
+          color: Colors.red.withOpacity(0.3),
+          width: 1,
+        ),
+      ),
+      child: ListTile(
+        onTap: onTap,
+        leading: Icon(icon, color: Colors.red, size: 24),
+        title: Text(
+          title,
+          style: const TextStyle(
+            color: Colors.red,
+            fontSize: 16,
+            fontWeight: FontWeight.w600,
+          ),
+        ),
+        subtitle: Text(
+          subtitle,
+          style: TextStyle(
+            color: Colors.red.withOpacity(0.7),
+            fontSize: 14,
+          ),
+        ),
+        trailing: const Icon(
+          Icons.chevron_right,
+          color: Colors.red,
+        ),
       ),
     );
   }

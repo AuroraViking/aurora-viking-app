@@ -63,7 +63,6 @@ class _AuroraPostCardState extends State<AuroraPostCard> {
         _isLoadingComments = false;
       });
     } catch (e) {
-      print('Error loading comments: $e');
       setState(() => _isLoadingComments = false);
     }
   }
@@ -92,11 +91,8 @@ class _AuroraPostCardState extends State<AuroraPostCard> {
   }
 
   Future<void> _handleLike() async {
-    print('Like button pressed for sighting: ${widget.sighting.id}');
     try {
-      print('Calling confirmAuroraSighting...');
       final result = await _firebaseService.confirmAuroraSighting(widget.sighting.id);
-      print('confirmAuroraSighting result: $result');
       
       setState(() {
         _isLiked = result['isLiked'];
@@ -106,9 +102,7 @@ class _AuroraPostCardState extends State<AuroraPostCard> {
           isVerified: result['confirmations'] >= 3,
         );
       });
-      print('State updated successfully');
     } catch (e) {
-      print('Error handling like: $e');
       // Show error to user
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
@@ -629,4 +623,4 @@ Shared via Aurora Viking App
       default: return Colors.grey;
     }
   }
-} 
+}

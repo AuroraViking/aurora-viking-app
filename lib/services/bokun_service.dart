@@ -28,9 +28,6 @@ class BokunService {
     final date = '${now.year}-${now.month.toString().padLeft(2, '0')}-${now.day.toString().padLeft(2, '0')} ${now.hour.toString().padLeft(2, '0')}:${now.minute.toString().padLeft(2, '0')}:${now.second.toString().padLeft(2, '0')}';
     final signature = _generateSignature(date, path);
     
-    print('🔑 Using date format: $date');
-    print('🔑 Generated signature: $signature');
-    
     return {
       'X-Bokun-Date': date,
       'X-Bokun-AccessKey': _accessKey,
@@ -46,9 +43,6 @@ class BokunService {
         Uri.parse('$_baseUrl/orders'),
         headers: _getAuthHeaders('/orders'),
       );
-
-      print('API Response Status: ${response.statusCode}');
-      print('API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -75,7 +69,6 @@ class BokunService {
           );
         }).toList();
       } else {
-        print('Failed to fetch tours: ${response.statusCode} - ${response.body}');
         throw Exception('Failed to fetch tours: ${response.statusCode}');
       }
     } catch (e) {
@@ -90,9 +83,6 @@ class BokunService {
         Uri.parse('$_baseUrl/orders/past'),
         headers: _getAuthHeaders('/orders/past'),
       );
-
-      print('API Response Status: ${response.statusCode}');
-      print('API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -120,7 +110,6 @@ class BokunService {
           );
         }).toList();
       } else {
-        print('Failed to fetch past tours: ${response.statusCode} - ${response.body}');
         throw Exception('Failed to fetch past tours: ${response.statusCode}');
       }
     } catch (e) {
@@ -136,14 +125,10 @@ class BokunService {
         headers: _getAuthHeaders('/orders/$bookingReference'),
       );
 
-      print('API Response Status: ${response.statusCode}');
-      print('API Response Body: ${response.body}');
-
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
         return _processBookingData(data);
       } else {
-        print('Failed to fetch tour details: ${response.statusCode} - ${response.body}');
         throw Exception('Failed to fetch tour details: ${response.statusCode}');
       }
     } catch (e) {
@@ -154,19 +139,13 @@ class BokunService {
 
   Future<bool> verifyEmail(String email) async {
     try {
-      print('🔍 Verifying email: $email');
-      
       // First try to verify using the booking reference
       const bookingRef = 'AUR-65391772'; // Using the provided booking reference
-      print('🔑 Checking booking reference: $bookingRef');
       
       final response = await http.get(
         Uri.parse('$_baseUrl/orders/$bookingRef'),
         headers: _getAuthHeaders('/orders/$bookingRef'),
       );
-
-      print('📡 API Response Status: ${response.statusCode}');
-      print('📦 API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -176,19 +155,14 @@ class BokunService {
           final status = order['status']?.toString().toLowerCase();
           final orderEmail = order['customer']?['email']?.toString().toLowerCase();
           
-          print('📊 Order found with status: $status');
-          print('📧 Order email: $orderEmail');
-          
           // Verify that the email matches and status is valid
           final isValid = orderEmail == email.toLowerCase() && 
                          (status == 'confirmed' || status == 'pending');
           
-          print('✅ Order verification result: $isValid');
           return isValid;
         }
       }
       
-      print('❌ Failed to verify booking: ${response.statusCode} - ${response.body}');
       throw Exception('Failed to verify booking: ${response.statusCode}');
     } catch (e) {
       print('❌ Error verifying booking: $e');
@@ -234,22 +208,14 @@ class BokunService {
   // Make verifyBookingReference static
   static Future<Map<String, dynamic>?> verifyBookingReference(String reference) async {
     try {
-      print('🔍 Verifying booking reference: $reference');
-      
       // Use the orders endpoint with a query parameter
       final path = '/orders?reference=$reference';
       final headers = _getAuthHeaders(path);
-      
-      print('🔑 Using headers: $headers');
-      print('🔑 Making request to: $_baseUrl$path');
       
       final response = await http.get(
         Uri.parse('$_baseUrl$path'),
         headers: headers,
       );
-
-      print('📡 API Response Status: ${response.statusCode}');
-      print('📦 API Response Body: ${response.body}');
 
       if (response.statusCode == 200) {
         final data = json.decode(response.body);
@@ -257,8 +223,6 @@ class BokunService {
         
         if (orders.isNotEmpty) {
           final order = orders.first;
-          print('✅ Found matching order');
-          print('📊 Order status: ${order['status']}');
           
           // Extract order details
           final status = order['status']?.toString().toLowerCase();
@@ -285,7 +249,6 @@ class BokunService {
         }
       }
       
-      print('❌ Failed to verify booking: ${response.statusCode} - ${response.body}');
       return null;
     } catch (e) {
       print('❌ Error verifying booking: $e');
@@ -310,4 +273,4 @@ class BokunService {
       'cancellationPolicy': product['cancellationPolicy']?.toString() ?? 'Contact for details',
     };
   }
-} 
+}

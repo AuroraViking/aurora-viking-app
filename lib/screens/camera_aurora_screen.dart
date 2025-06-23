@@ -180,8 +180,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
   // Native camera methods
   Future<void> _initializeNativeCamera() async {
     try {
-      print('🔧 Initializing native camera...');
-      
       // Request camera permissions
       final cameraPermission = await Permission.camera.request();
       if (!cameraPermission.isGranted) {
@@ -202,10 +200,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           _maxExposureTime = result['maxExposureTime']?.toDouble() ?? 30.0;
         });
         
-        print('✅ Native camera initialized successfully');
-        print('   ISO range: ${_minISO.round()} - ${_maxISO.round()}');
-        print('   Exposure range: ${_minExposureTime}s - ${_maxExposureTime}s');
-        
         // Apply initial settings
         _applyCameraSettings();
       } else {
@@ -213,7 +207,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       }
       
     } catch (e) {
-      print('❌ Failed to initialize native camera: $e');
       _showErrorDialog('Failed to initialize professional camera controls: $e');
     }
   }
@@ -225,7 +218,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
         setState(() {
           _isCameraInitialized = false;
         });
-        print('🔧 Native camera disposed');
       }
     } catch (e) {
       print('⚠️ Error disposing camera: $e');
@@ -236,11 +228,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     if (!_isCameraInitialized) return;
     
     try {
-      print('📸 Applying camera settings to native camera:');
-      print('   ISO: ${_currentISO.round()}');
-      print('   Exposure Time: ${_currentExposureTime}s');
-      print('   Focus: ${_currentFocus == 1.0 ? 'Infinity' : '${(_currentFocus * 100).round()}%'}');
-
       final result = await _cameraChannel.invokeMethod('applyCameraSettings', {
         'iso': _currentISO.round(),
         'exposureTimeSeconds': _currentExposureTime,
@@ -249,7 +236,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
 
       if (result['success'] == true) {
         HapticFeedback.selectionClick();
-        print('✅ Camera settings applied successfully');
       } else {
         print('⚠️ Failed to apply some camera settings: ${result['error']}');
       }
@@ -267,9 +253,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     });
 
     try {
-      print('📸 Starting native camera capture...');
-      print('   Settings: ISO ${_currentISO.round()}, ${_currentExposureTime}s exposure');
-
       // Show capture feedback
       HapticFeedback.heavyImpact();
       ScaffoldMessenger.of(context).showSnackBar(
@@ -303,8 +286,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           _isCapturing = false;
         });
 
-        print('✅ Photo captured successfully: $imagePath');
-        
         // Hide snackbar and show success
         ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
@@ -423,11 +404,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
     try {
       HapticFeedback.mediumImpact();
 
-      print('📸 Submitting aurora sighting...');
-      print('   Location: ${_currentPosition!.latitude}, ${_currentPosition!.longitude}');
-      print('   Photo: ${_capturedPhoto!.path}');
-      print('   Intensity: $_selectedIntensity');
-
       // Submit to Firebase
       final sightingId = await _firebaseService.submitAuroraSighting(
         latitude: _currentPosition!.latitude,
@@ -440,8 +416,6 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
         kp: _currentKp,
         solarWindSpeed: _solarWindSpeed,
       );
-
-      print('✅ Sighting submitted with ID: $sightingId');
 
       _showSuccessDialog();
 

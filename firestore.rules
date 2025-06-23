@@ -15,6 +15,11 @@ service cloud.firestore {
       return exists(/databases/$(database)/documents/admins/$(request.auth.uid));
     }
 
+    // Allow full access for Firebase service accounts (Cloud Functions)
+    match /{document=**} {
+      allow read, write: if request.auth.token.admin == true;
+    }
+
     // Aurora sightings
     match /aurora_sightings/{sightingId} {
       allow read: if true;

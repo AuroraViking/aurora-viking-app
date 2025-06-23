@@ -1,3 +1,5 @@
+// This file is excluded from production builds. Recommend removing from build or export list.
+
 // lib/screens/camera_debug_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';

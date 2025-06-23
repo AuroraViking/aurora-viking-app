@@ -31,11 +31,9 @@ class CloudCoverService {
             'icon': data['weather'][0]['icon'] ?? '',
             'provider': 'OpenWeatherMap',
           };
-        } else {
-          print('OpenWeatherMap error: ${response.statusCode} ${response.body}');
         }
       } catch (e) {
-        print('OpenWeatherMap exception: $e');
+        // Handle exception
       }
     }
     // Fallback to Open-Meteo (no API key required)
@@ -57,13 +55,11 @@ class CloudCoverService {
         };
       } else {
         final errorMsg = 'Open-Meteo error: ${response.statusCode} ${response.body}';
-        print(errorMsg);
         return {'error': errorMsg};
       }
     } catch (e) {
       final errorMsg = 'Open-Meteo exception: $e';
-      print(errorMsg);
       return {'error': errorMsg};
     }
   }
-} 
+}

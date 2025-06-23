@@ -4,6 +4,8 @@ import 'dart:io';
 import '../services/firebase_service.dart';
 import 'my_photos_tab.dart';
 import 'edit_profile_screen.dart';
+import 'notification_settings_screen.dart';
+import 'privacy_settings_screen.dart';
 import 'package:url_launcher/url_launcher.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
@@ -247,7 +249,12 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                         Icons.notifications,
                         Colors.orangeAccent,
                         onTap: () {
-                          // TODO: Implement notification settings
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationSettingsScreen(),
+                            ),
+                          );
                         },
                       ),
                       _buildSettingsItem(
@@ -256,19 +263,14 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                         Icons.privacy_tip,
                         Colors.purpleAccent,
                         onTap: () {
-                          // TODO: Implement privacy settings
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PrivacySettingsScreen(),
+                            ),
+                          );
                         },
                       ),
-                      if (userType != 'tour_participant')
-                        _buildSettingsItem(
-                          context,
-                          'Verify Tour Booking',
-                          Icons.card_travel,
-                          Colors.tealAccent,
-                          onTap: () {
-                            _showVerifyTourDialog(context);
-                          },
-                        ),
                       if (userType == 'tour_participant')
                         _buildSettingsItem(
                           context,
@@ -460,51 +462,5 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       default:
         return 'Guest';
     }
-  }
-
-  void _showVerifyTourDialog(BuildContext context) {
-    final TextEditingController emailController = TextEditingController();
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: const Text('Verify Tour Booking'),
-        content: TextField(
-          controller: emailController,
-          decoration: const InputDecoration(
-            labelText: 'Enter your tour booking email',
-          ),
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: const Text('Cancel'),
-          ),
-          TextButton(
-            onPressed: () async {
-              final email = emailController.text.trim();
-              if (email.isNotEmpty) {
-                final verificationResult = await _firebaseService.verifyTourParticipant(email);
-                if (verificationResult != null && verificationResult['isValid'] == true) {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Tour booking verified successfully!'),
-                      backgroundColor: Colors.green,
-                    ),
-                  );
-                } else {
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(
-                      content: Text('Failed to verify tour booking. Please check your reference number.'),
-                      backgroundColor: Colors.red,
-                    ),
-                  );
-                }
-              }
-            },
-            child: const Text('Verify'),
-          ),
-        ],
-      ),
-    );
   }
 } 

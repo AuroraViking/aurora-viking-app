@@ -81,9 +81,7 @@ class ConfigService {
       
       // Set initialization flag
       _isInitialized = true;
-      print('ConfigService initialized successfully');
     } catch (e) {
-      print('Error initializing ConfigService: $e');
       rethrow;
     }
   }
@@ -116,4 +114,4 @@ class NotInitializedError extends Error {
   
   @override
   String toString() => message;
-} 
+}

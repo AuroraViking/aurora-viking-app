@@ -13,23 +13,25 @@ class _AuroraNativeAdCardState extends State<AuroraNativeAdCard> {
   NativeAd? _nativeAd;
   bool _isLoaded = false;
 
-  static const String _testAdUnitId = 'ca-app-pub-3940256099942544/2247696110'; // Google's test native ad unit
+  // static const String _testAdUnitId = 'ca-app-pub-3940256099942544/2247696110'; // Google's test native ad unit
+  // TODO: When enabling native ads, use the production ad unit ID here.
 
   @override
   void initState() {
     super.initState();
-    _nativeAd = NativeAd(
-      adUnitId: _testAdUnitId,
-      factoryId: 'listTile', // We'll use a custom factory for styling
-      request: const AdRequest(),
-      listener: NativeAdListener(
-        onAdLoaded: (ad) => setState(() => _isLoaded = true),
-        onAdFailedToLoad: (ad, error) {
-          ad.dispose();
-          setState(() => _isLoaded = false);
-        },
-      ),
-    )..load();
+    // Native ads are currently disabled in production. Uncomment and set production ad unit ID to enable.
+    // _nativeAd = NativeAd(
+    //   adUnitId: '<YOUR_PRODUCTION_NATIVE_AD_UNIT_ID>',
+    //   factoryId: 'listTile',
+    //   request: const AdRequest(),
+    //   listener: NativeAdListener(
+    //     onAdLoaded: (ad) => setState(() => _isLoaded = true),
+    //     onAdFailedToLoad: (ad, error) {
+    //       ad.dispose();
+    //       setState(() => _isLoaded = false);
+    //     },
+    //   ),
+    // )..load();
   }
 
   @override

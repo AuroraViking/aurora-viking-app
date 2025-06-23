@@ -30,23 +30,18 @@ class _AuroraPowerChartState extends State<AuroraPowerChart> {
   @override
   void initState() {
     super.initState();
-    print('🎨 Chart initState: initial data length = ${widget.data.length}');
     _data = widget.data;
     _isLoading = widget.data.isEmpty;
 
     // Listen for updates
     widget.service.auroralPowerStream.listen((newData) {
-      print('🎨 Chart received stream data with keys: ${newData.keys}');
       if (mounted && newData.containsKey('historicalData')) {
         final historicalData = newData['historicalData'];
         if (historicalData is List<AuroraPowerPoint>) {
-          print('🎨 Updating chart with ${historicalData.length} data points');
           setState(() {
             _data = historicalData;
             _isLoading = false;
           });
-        } else {
-          print('❌ Historical data is wrong type: ${historicalData.runtimeType}');
         }
       }
     });
@@ -54,10 +49,7 @@ class _AuroraPowerChartState extends State<AuroraPowerChart> {
 
   @override
   Widget build(BuildContext context) {
-    print('🎨 Chart build: isLoading=$_isLoading, data.length=${_data.length}');
-
     if (_isLoading) {
-      print('📊 Chart showing loading because: isLoading=$_isLoading');
       return const Center(
         child: Column(
           mainAxisAlignment: MainAxisAlignment.center,
@@ -88,8 +80,6 @@ class _AuroraPowerChartState extends State<AuroraPowerChart> {
       );
     }
 
-    print('📊 Chart building actual chart with ${_data.length} data points');
-
     // Sort data by time (oldest to newest)
     final sortedData = List<AuroraPowerPoint>.from(_data)
       ..sort((a, b) => a.time.compareTo(b.time));
@@ -99,8 +89,6 @@ class _AuroraPowerChartState extends State<AuroraPowerChart> {
     final minPower = sortedData.map((point) => point.power).reduce((a, b) => a < b ? a : b);
     final yMax = maxPower + (maxPower * 0.2); // 20% padding
     final yMin = (minPower - (minPower * 0.2)).clamp(0.0, double.infinity); // Safe clamp
-
-    print('📊 Chart Y-axis: min=$minPower, max=$maxPower, chart min=$yMin, chart max=$yMax');
 
     // Calculate grid interval
     final range = yMax - yMin;
