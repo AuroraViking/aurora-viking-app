@@ -629,34 +629,8 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           mainAxisSize: MainAxisSize.min,
           children: [
             Text(
-              '🌌 Your professional aurora photo has been shared with the community!',
+              'You have shared your sighting with the community',
               style: TextStyle(color: _nightVisionMode ? Colors.red.shade200 : Colors.white70),
-            ),
-            SizedBox(height: 16),
-            Container(
-              padding: EdgeInsets.all(12),
-              decoration: BoxDecoration(
-                color: (_nightVisionMode ? Colors.red.shade100 : Colors.tealAccent).withOpacity(0.1),
-                borderRadius: BorderRadius.circular(8),
-                border: Border.all(color: (_nightVisionMode ? Colors.red.shade100 : Colors.tealAccent).withOpacity(0.3)),
-              ),
-              child: Row(
-                children: [
-                  Icon(Icons.print, 
-                    color: _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent, size: 20),
-                  SizedBox(width: 8),
-                  Expanded(
-                    child: Text(
-                      'Your high-quality aurora photo is now available in the Print Shop!',
-                      style: TextStyle(
-                        color: _nightVisionMode ? Colors.red.shade100 : Colors.tealAccent,
-                        fontSize: 12,
-                        fontWeight: FontWeight.bold,
-                      ),
-                    ),
-                  ),
-                ],
-              ),
             ),
           ],
         ),
