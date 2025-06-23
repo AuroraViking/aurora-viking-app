@@ -13,6 +13,8 @@ import 'spot_aurora_screen.dart';
 import 'edit_profile_screen.dart';
 import 'user_profile_screen.dart';
 import '../widgets/aurora_photo_viewer.dart';
+import '../services/solar_wind_service.dart';
+import '../services/kp_service.dart';
 
 class AuroraAlertsTab extends StatefulWidget {
   const AuroraAlertsTab({super.key});
@@ -32,6 +34,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
   bool _isLoadingLocation = true;
   final String _activityLevel = 'No Recent Activity';
   GoogleMapController? _mapController;
+  List<String> _notifiedSightingIds = []; // Track notified sighting IDs
 
   @override
   void initState() {
@@ -40,6 +43,8 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
     _tabController.addListener(_handleTabChange);
     _getCurrentLocation();
     _loadSightings();
+    initializeLocalNotifications();
+    _checkHighActivityAlert();
   }
 
   @override
@@ -105,24 +110,32 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
 
   Future<void> _loadNearbySightings() async {
     if (_currentLocation == null) return;
-
     try {
       final now = DateTime.now();
       final twelveHoursAgo = now.subtract(const Duration(hours: 12));
-
       final nearbySightings = await _firebaseService.getNearbyAuroraSightings(
         latitude: _currentLocation!.latitude,
         longitude: _currentLocation!.longitude,
-        radiusKm: 100,
+        radiusKm: 50, // 50 km radius for notifications
         hours: 12,
       );
-
       if (mounted) {
         final sightings = nearbySightings
             .map((doc) => AuroraSighting.fromFirestore(doc))
             .where((sighting) => sighting.timestamp.isAfter(twelveHoursAgo))
             .toList();
-
+        // Notification logic: notify for new sightings in 50km radius
+        if (await _firebaseService.shouldShowNearbyAlert()) {
+          for (final sighting in sightings) {
+            if (!_notifiedSightingIds.contains(sighting.id)) {
+              showAuroraNearbyNotification(
+                'Aurora Spotted Nearby!',
+                '${sighting.userName} spotted the aurora near ${sighting.locationName}',
+              );
+              _notifiedSightingIds.add(sighting.id);
+            }
+          }
+        }
         setState(() {
           _nearbySightings = sightings;
         });
@@ -138,6 +151,33 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
       _loadSightings(),
       if (_currentLocation != null) _loadNearbySightings(),
     ]);
+  }
+
+  Future<void> _checkHighActivityAlert() async {
+    if (_currentLocation == null) return;
+    if (!await _firebaseService.shouldShowHighActivityAlert()) return;
+    // Fetch real-time BzH (mean of last 30 min Bz values)
+    final bzHistory = await SolarWindService.fetchBzHistory();
+    double bzH = 0.0;
+    if (bzHistory.bzValues.isNotEmpty) {
+      // Take the mean of the last 6 values (assuming 5-min intervals)
+      final recent = bzHistory.bzValues.length >= 6
+          ? bzHistory.bzValues.sublist(bzHistory.bzValues.length - 6)
+          : bzHistory.bzValues;
+      bzH = recent.reduce((a, b) => a + b) / recent.length;
+    }
+    // Fetch real-time Kp
+    double kp = await KpService.fetchCurrentKp();
+    double latitude = _currentLocation!.latitude;
+    DateTime now = DateTime.now();
+    bool isDark = now.hour < 4 || now.hour > 22; // Example: night hours
+    double kpThreshold = latitude.abs() > 65 ? 2.0 : latitude.abs() > 55 ? 4.0 : 6.0;
+    if (bzH >= 7.0 && kp >= kpThreshold && isDark) {
+      showHighActivityNotification(
+        'High Aurora Activity!',
+        'Aurora is likely to form in your area within the hour. Look up!'
+      );
+    }
   }
 
   @override
@@ -710,5 +750,17 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
         ),
       ),
     );
+  }
+
+  Future<void> initializeLocalNotifications() async {
+    // Initialize local notifications settings and permissions
+  }
+
+  void showAuroraNearbyNotification(String title, String body) {
+    // Show a local notification for a new nearby aurora sighting
+  }
+
+  void showHighActivityNotification(String title, String body) {
+    // Show a local notification for high aurora activity
   }
 }

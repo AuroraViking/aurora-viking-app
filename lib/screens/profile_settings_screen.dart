@@ -6,6 +6,9 @@ import 'tour_auth_screen.dart';
 import 'my_photos_tab.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:url_launcher/url_launcher_string.dart';
+import 'edit_profile_screen.dart';
+import 'notification_settings_screen.dart';
+import 'privacy_settings_screen.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -236,7 +239,12 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                         Icons.edit,
                         Colors.blueAccent,
                         onTap: () {
-                          // TODO: Implement edit profile
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const EditProfileScreen(),
+                            ),
+                          ).then((_) => _loadUserData());
                         },
                       ),
                       _buildSettingsItem(
@@ -245,7 +253,12 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                         Icons.notifications,
                         Colors.orangeAccent,
                         onTap: () {
-                          // TODO: Implement notification settings
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const NotificationSettingsScreen(),
+                            ),
+                          );
                         },
                       ),
                       _buildSettingsItem(
@@ -254,7 +267,12 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                         Icons.privacy_tip,
                         Colors.purpleAccent,
                         onTap: () {
-                          // TODO: Implement privacy settings
+                          Navigator.push(
+                            context,
+                            MaterialPageRoute(
+                              builder: (context) => const PrivacySettingsScreen(),
+                            ),
+                          );
                         },
                       ),
                       if (userType == 'tour_participant')

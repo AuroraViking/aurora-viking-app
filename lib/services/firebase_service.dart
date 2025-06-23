@@ -12,6 +12,7 @@ import '../models/aurora_sighting.dart';
 import '../models/aurora_comment.dart';
 import '../models/user_aurora_photo.dart';
 import 'package:geolocator/geolocator.dart';
+import 'package:flutter_local_notifications/flutter_local_notifications.dart';
 
 class FirebaseService {
   static final FirebaseService _instance = FirebaseService._internal();
@@ -609,6 +610,79 @@ class FirebaseService {
     });
   }
 
+  // LOCAL NOTIFICATIONS
+
+  final FlutterLocalNotificationsPlugin flutterLocalNotificationsPlugin = FlutterLocalNotificationsPlugin();
+
+  Future<void> initializeLocalNotifications() async {
+    const AndroidInitializationSettings initializationSettingsAndroid =
+        AndroidInitializationSettings('@mipmap/ic_launcher');
+    final InitializationSettings initializationSettings = InitializationSettings(
+      android: initializationSettingsAndroid,
+    );
+    await flutterLocalNotificationsPlugin.initialize(initializationSettings);
+  }
+
+  Future<void> showAuroraNearbyNotification(String title, String body) async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'aurora_nearby_channel',
+      'Nearby Aurora Sightings',
+      channelDescription: 'Notifications for aurora sightings near you',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+    );
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+    await flutterLocalNotificationsPlugin.show(
+      0,
+      title,
+      body,
+      platformChannelSpecifics,
+    );
+  }
+
+  Future<void> showHighActivityNotification(String title, String body) async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'aurora_high_activity_channel',
+      'High Aurora Activity',
+      channelDescription: 'Notifications for high aurora activity',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+    );
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+    await flutterLocalNotificationsPlugin.show(
+      1,
+      title,
+      body,
+      platformChannelSpecifics,
+    );
+  }
+
+  Future<void> showAppUpdateNotification(String title, String body) async {
+    const AndroidNotificationDetails androidPlatformChannelSpecifics =
+        AndroidNotificationDetails(
+      'app_update_channel',
+      'App Updates',
+      channelDescription: 'Notifications for app updates',
+      importance: Importance.max,
+      priority: Priority.high,
+      showWhen: true,
+    );
+    const NotificationDetails platformChannelSpecifics =
+        NotificationDetails(android: androidPlatformChannelSpecifics);
+    await flutterLocalNotificationsPlugin.show(
+      2,
+      title,
+      body,
+      platformChannelSpecifics,
+    );
+  }
+
   // UTILITY METHODS
 
   // Calculate distance between two points (Haversine formula)
@@ -1010,5 +1084,69 @@ class FirebaseService {
     } catch (e) {
       throw Exception('Failed to add aurora sighting: $e');
     }
+  }
+
+  Future<Map<String, dynamic>> getUserNotificationSettings() async {
+    if (currentUser == null) return {
+      'appUpdates': true,
+      'highActivityAlert': true,
+      'alertNearby': true,
+    };
+    final doc = await firestore.collection('users').doc(currentUser!.uid).get();
+    final data = doc.data() ?? {};
+    return {
+      'appUpdates': data['appUpdates'] ?? true,
+      'highActivityAlert': data['highActivityAlert'] ?? true,
+      'alertNearby': data['alertNearby'] ?? true,
+    };
+  }
+
+  Future<void> setUserNotificationSettings({
+    bool? auroraAlerts,
+    bool? appUpdates,
+    bool? highActivityAlert,
+    bool? alertNearby,
+  }) async {
+    if (currentUser == null) return;
+    final updates = <String, dynamic>{};
+    if (auroraAlerts != null) updates['auroraAlerts'] = auroraAlerts;
+    if (appUpdates != null) updates['appUpdates'] = appUpdates;
+    if (highActivityAlert != null) updates['highActivityAlert'] = highActivityAlert;
+    if (alertNearby != null) updates['alertNearby'] = alertNearby;
+    if (updates.isNotEmpty) {
+      await firestore.collection('users').doc(currentUser!.uid).update(updates);
+    }
+  }
+
+  Future<void> checkAndNotifyAppUpdate({required String latestVersion}) async {
+    if (!await shouldShowAppUpdateAlert()) return;
+    // You would fetch the current app version from package_info_plus
+    // and compare with latestVersion (from your backend or store)
+    // For demonstration, always show notification:
+    showAppUpdateNotification(
+      'App Update Available!',
+      'A new version of Aurora Viking is available. Please update for the best experience.',
+    );
+  }
+
+  Future<bool> shouldShowAppUpdateAlert() async {
+    if (currentUser == null) return true;
+    final doc = await firestore.collection('users').doc(currentUser!.uid).get();
+    final data = doc.data() ?? {};
+    return data['appUpdates'] ?? true;
+  }
+
+  Future<bool> shouldShowNearbyAlert() async {
+    if (currentUser == null) return true;
+    final doc = await firestore.collection('users').doc(currentUser!.uid).get();
+    final data = doc.data() ?? {};
+    return data['alertNearby'] ?? true;
+  }
+
+  Future<bool> shouldShowHighActivityAlert() async {
+    if (currentUser == null) return true;
+    final doc = await firestore.collection('users').doc(currentUser!.uid).get();
+    final data = doc.data() ?? {};
+    return data['highActivityAlert'] ?? true;
   }
 }
