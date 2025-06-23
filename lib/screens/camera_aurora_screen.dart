@@ -443,15 +443,17 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
 
       print('✅ Sighting submitted with ID: $sightingId');
 
-      if (sightingId != null) {
-        _showSuccessDialog();
-      } else {
-        _showErrorDialog('Failed to submit aurora sighting. Please try again.');
-      }
+      _showSuccessDialog();
 
     } catch (e) {
       print('❌ Error submitting sighting: $e');
-      _showErrorDialog('Error submitting sighting: ${e.toString()}');
+      
+      // Check if it's a block error and show specific message
+      if (e.toString().contains('blocked')) {
+        _showErrorDialog('Your account has been blocked. You cannot post new sightings. Please contact support if you believe this is an error.');
+      } else {
+        _showErrorDialog('Error submitting sighting: ${e.toString()}');
+      }
     } finally {
       setState(() {
         _isSubmitting = false;

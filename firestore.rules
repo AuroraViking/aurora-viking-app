@@ -48,11 +48,9 @@ service cloud.firestore {
       allow read: if true;
       allow create: if isAuthenticated() && request.auth.uid == userId;
       allow update: if isAuthenticated() && (
-        // Allow users to update their own profile
         request.auth.uid == userId ||
-        // Allow updates to verification count and last active
         request.resource.data.diff(resource.data).affectedKeys()
-          .hasOnly(['verificationCount', 'lastActive', 'auroraSpottingCount'])
+          .hasOnly(['verificationCount', 'lastActive', 'auroraSpottingCount', 'location', 'lastLocationName'])
       );
       allow delete: if isAuthenticated() && request.auth.uid == userId;
     }

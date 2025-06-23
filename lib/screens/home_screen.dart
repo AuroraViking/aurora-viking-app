@@ -1,8 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 import 'forecast_tab.dart';
-import 'my_photos_tab.dart';
-import 'prints_tab.dart' as prints;
 import 'aurora_alerts_tab.dart';
 import 'spot_aurora_screen.dart';
 import 'camera_debug_screen.dart'; // Add this import
@@ -146,10 +144,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         return const ForecastTab();
       case 1:
         return const AuroraAlertsTab();
-      case 2:
-        return const MyPhotosTab();
-      case 3:
-        return const prints.PrintsTab();
       default:
         return const ForecastTab();
     }
@@ -166,8 +160,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
       destinations: [
         _buildNavItem(0, Icons.radar, 'Forecast'),
         _buildNavItem(1, Icons.notifications, 'Aurora Sightings'),
-        _buildNavItem(2, Icons.photo_library, 'Photos'),
-        _buildNavItem(3, Icons.print, 'Prints'),
       ],
     );
   }

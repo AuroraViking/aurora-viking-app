@@ -3,8 +3,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import '../models/aurora_sighting.dart';
 import '../widgets/aurora_post_card.dart';
+import '../services/firebase_service.dart';
 
 class AdminReportsScreen extends StatelessWidget {
+  final FirebaseService _firebaseService = FirebaseService();
+
   Future<AuroraSighting?> _fetchSighting(String sightingId) async {
     print('Fetching sighting: $sightingId');
     final doc = await FirebaseFirestore.instance.collection('aurora_sightings').doc(sightingId).get();
@@ -327,6 +330,13 @@ class AdminReportsScreen extends StatelessWidget {
     return Scaffold(
       appBar: AppBar(
         title: const Text('Admin Reports'),
+        actions: [
+          IconButton(
+            icon: const Icon(Icons.block),
+            onPressed: () => _showBlockedUsersDialog(context),
+            tooltip: 'Manage Blocked Users',
+          ),
+        ],
       ),
       body: StreamBuilder<QuerySnapshot>(
         stream: FirebaseFirestore.instance.collection('reports').orderBy('timestamp', descending: true).snapshots(),
@@ -383,5 +393,139 @@ class AdminReportsScreen extends StatelessWidget {
         },
       ),
     );
+  }
+
+  Future<void> _showBlockedUsersDialog(BuildContext context) async {
+    try {
+      // Get all blocked users
+      final blockedSnapshot = await FirebaseFirestore.instance.collection('blocked_users').get();
+      
+      if (blockedSnapshot.docs.isEmpty) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: Text('Blocked Users'),
+            content: Text('No users are currently blocked.'),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Close'),
+              ),
+            ],
+          ),
+        );
+        return;
+      }
+
+      // Get user details for each blocked user
+      List<Map<String, dynamic>> blockedUsers = [];
+      for (final doc in blockedSnapshot.docs) {
+        final userId = doc.id;
+        final blockData = doc.data();
+        
+        try {
+          // Get user profile to get username
+          final userDoc = await FirebaseFirestore.instance.collection('users').doc(userId).get();
+          final userData = userDoc.data();
+          final userName = userData?['displayName'] ?? userData?['email']?.split('@')[0] ?? 'Unknown User';
+          
+          blockedUsers.add({
+            'userId': userId,
+            'userName': userName,
+            'email': userData?['email'] ?? 'No email',
+            'blockedAt': blockData['timestamp'],
+            'blockedBy': blockData['blockedBy'],
+            'reason': blockData['reason'] ?? 'No reason provided',
+          });
+        } catch (e) {
+          // If user profile not found, still show the blocked user
+          blockedUsers.add({
+            'userId': userId,
+            'userName': 'Unknown User',
+            'email': 'No email',
+            'blockedAt': blockData['timestamp'],
+            'blockedBy': blockData['blockedBy'],
+            'reason': blockData['reason'] ?? 'No reason provided',
+          });
+        }
+      }
+
+      showDialog(
+        context: context,
+        builder: (context) => StatefulBuilder(
+          builder: (context, setState) => AlertDialog(
+            title: Text('Blocked Users (${blockedUsers.length})'),
+            content: SizedBox(
+              width: double.maxFinite,
+              height: 400,
+              child: ListView.builder(
+                itemCount: blockedUsers.length,
+                itemBuilder: (context, index) {
+                  final user = blockedUsers[index];
+                  final blockedAt = user['blockedAt'] as Timestamp?;
+                  final blockedDate = blockedAt != null 
+                    ? blockedAt.toDate().toString().substring(0, 19) 
+                    : 'Unknown date';
+                  
+                  return Card(
+                    margin: EdgeInsets.symmetric(vertical: 4),
+                    child: ListTile(
+                      title: Text(user['userName']),
+                      subtitle: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text('Email: ${user['email']}'),
+                          Text('Blocked: $blockedDate'),
+                          Text('Reason: ${user['reason']}'),
+                        ],
+                      ),
+                      trailing: TextButton(
+                        onPressed: () async {
+                          final confirm = await showDialog<bool>(
+                            context: context,
+                            builder: (context) => AlertDialog(
+                              title: Text('Unblock User'),
+                              content: Text('Are you sure you want to unblock ${user['userName']}?'),
+                              actions: [
+                                TextButton(onPressed: () => Navigator.pop(context, false), child: Text('Cancel')),
+                                TextButton(onPressed: () => Navigator.pop(context, true), child: Text('Unblock')),
+                              ],
+                            ),
+                          );
+                          
+                          if (confirm == true) {
+                            await FirebaseFirestore.instance.collection('blocked_users').doc(user['userId']).delete();
+                            // Clear block cache to ensure user can post immediately
+                            await _firebaseService.clearBlockCache(user['userId']);
+                            setState(() {
+                              blockedUsers.removeAt(index);
+                            });
+                            ScaffoldMessenger.of(context).showSnackBar(
+                              SnackBar(content: Text('${user['userName']} has been unblocked.')),
+                            );
+                          }
+                        },
+                        child: Text('Unblock', style: TextStyle(color: Colors.green)),
+                      ),
+                    ),
+                  );
+                },
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: Text('Close'),
+              ),
+            ],
+          ),
+        ),
+      );
+    } catch (e) {
+      print('Error loading blocked users: $e');
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Error loading blocked users: $e')),
+      );
+    }
   }
 } 

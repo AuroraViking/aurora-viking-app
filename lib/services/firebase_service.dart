@@ -322,28 +322,43 @@ class FirebaseService {
     required double solarWindSpeed,
   }) async {
     if (currentUser == null) {
+      print('❌ User not authenticated');
       return null;
     }
 
     try {
+      print('🔍 Starting aurora sighting submission...');
+      print('   User: ${currentUser!.uid}');
+      print('   Location: $latitude, $longitude');
+      print('   Photo provided: ${photoFile != null || photoBytes != null}');
+      
       // Check if user is blocked
       final blockedDoc = await firestore.collection('blocked_users').doc(currentUser!.uid).get();
       if (blockedDoc.exists) {
+        print('❌ User is blocked: ${currentUser!.uid}');
         throw Exception('Your account has been blocked. You cannot post new sightings.');
       }
+      print('✅ User is not blocked');
 
       String? photoUrl;
 
       // Upload photo if provided
       if (photoFile != null || photoBytes != null) {
+        print('📸 Starting photo upload...');
         photoUrl = await _uploadAuroraPhoto(photoFile, photoBytes);
+        print('📸 Photo upload result: ${photoUrl != null ? 'Success' : 'Failed'}');
+        if (photoUrl != null) {
+          print('📸 Photo URL: $photoUrl');
+        }
       }
 
       // Get user's display name from their profile
       final userDoc = await firestore.collection('users').doc(currentUser!.uid).get();
       final userDisplayName = userDoc.data()?['displayName'] ?? currentUser!.displayName ?? currentUser!.email?.split('@')[0] ?? 'Anonymous';
+      print('👤 User display name: $userDisplayName');
 
       // Create sighting document
+      print('📝 Creating sighting document...');
       final sightingRef = await firestore.collection('aurora_sightings').add({
         'userId': currentUser!.uid,
         'userName': userDisplayName,
@@ -364,18 +379,23 @@ class FirebaseService {
         'reportCount': 0,
       });
 
+      print('✅ Sighting document created with ID: ${sightingRef.id}');
+
       // Update user's profile with location and sighting count
       if (isAuthenticated) {
+        print('👤 Updating user profile...');
         await firestore.collection('users').doc(currentUser!.uid).update({
           'auroraSpottingCount': FieldValue.increment(1),
           'lastActive': FieldValue.serverTimestamp(),
           'location': GeoPoint(latitude, longitude),
           'lastLocationName': address,
         });
+        print('✅ User profile updated');
       }
 
       // Also save as user photo if photo was uploaded
       if (photoUrl != null) {
+        print('📸 Saving as user photo...');
         await UserPhotosService.saveUserPhoto(
           sightingId: sightingRef.id,
           photoUrl: photoUrl,
@@ -392,12 +412,16 @@ class FirebaseService {
             },
           },
         );
+        print('✅ User photo saved');
       }
 
+      print('🎉 Aurora sighting submission completed successfully');
       return sightingRef.id;
     } catch (e) {
       print('❌ Failed to submit aurora sighting: $e');
-      return null;
+      print('❌ Error type: ${e.runtimeType}');
+      print('❌ Error details: $e');
+      rethrow;
     }
   }
 
@@ -506,23 +530,45 @@ class FirebaseService {
   // Upload aurora photo
   Future<String?> _uploadAuroraPhoto(File? file, Uint8List? bytes) async {
     try {
+      print('📸 Starting photo upload...');
+      print('   File provided: ${file != null}');
+      print('   Bytes provided: ${bytes != null}');
+      
       final timestamp = DateTime.now().millisecondsSinceEpoch;
       final fileName = 'aurora_${currentUser!.uid}_$timestamp.jpg';
       final ref = storage.ref().child('aurora_photos/$fileName');
+      
+      print('📸 Upload path: aurora_photos/$fileName');
 
       UploadTask uploadTask;
       if (file != null) {
+        print('📸 Using file upload');
+        print('   File path: ${file.path}');
+        print('   File exists: ${await file.exists()}');
+        print('   File size: ${await file.length()} bytes');
         uploadTask = ref.putFile(file);
       } else if (bytes != null) {
+        print('📸 Using bytes upload');
+        print('   Bytes length: ${bytes.length}');
         uploadTask = ref.putData(bytes);
       } else {
+        print('❌ No file or bytes provided');
         return null;
       }
 
+      print('📸 Upload task started, waiting for completion...');
       final snapshot = await uploadTask;
-      return await snapshot.ref.getDownloadURL();
+      print('📸 Upload completed');
+      print('   Bytes transferred: ${snapshot.bytesTransferred}');
+      print('   Total bytes: ${snapshot.totalBytes}');
+      
+      final downloadUrl = await snapshot.ref.getDownloadURL();
+      print('📸 Download URL obtained: $downloadUrl');
+      return downloadUrl;
     } catch (e) {
       print('❌ Failed to upload photo: $e');
+      print('❌ Error type: ${e.runtimeType}');
+      print('❌ Error details: $e');
       return null;
     }
   }
@@ -1010,7 +1056,7 @@ class FirebaseService {
 
   Future<void> addAuroraSighting(AuroraSighting sighting) async {
     try {
-      final docRef = await firestore.collection('aurora_sightings').add(sighting.toMap());
+      final docRef = await firestore.collection('aurora_sightings').add(sighting.toFirestore());
       sighting.id = docRef.id;
     } catch (e) {
       throw Exception('Failed to add aurora sighting: $e');
@@ -1094,6 +1140,17 @@ class FirebaseService {
     } catch (e) {
       print('❌ Failed to update notification settings: $e');
       throw Exception('Failed to update notification settings');
+    }
+  }
+
+  // Clear block cache for a user (call after unblocking)
+  Future<void> clearBlockCache(String userId) async {
+    try {
+      // Force a fresh read from Firestore by getting the document
+      await firestore.collection('blocked_users').doc(userId).get();
+      print('✅ Block cache cleared for user: $userId');
+    } catch (e) {
+      print('❌ Failed to clear block cache: $e');
     }
   }
 }
