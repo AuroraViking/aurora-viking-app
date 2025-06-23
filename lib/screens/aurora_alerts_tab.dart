@@ -15,6 +15,8 @@ import 'user_profile_screen.dart';
 import '../widgets/aurora_photo_viewer.dart';
 import '../services/solar_wind_service.dart';
 import '../services/kp_service.dart';
+import '../widgets/admob_banner_card.dart';
+import '../widgets/aurora_native_ad_card.dart';
 
 class AuroraAlertsTab extends StatefulWidget {
   const AuroraAlertsTab({super.key});
@@ -236,9 +238,21 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: displayList.length,
+              itemCount: displayList.length + 1 + (displayList.length ~/ 5), // +1 for top ad, +1 ad every 5 posts
               itemBuilder: (context, index) {
-                final sighting = displayList[index];
+                if (index == 0) {
+                  // Banner ad at the very top
+                  return const AdMobBannerCard(testMode: true);
+                }
+                // Insert banner ad every 5 posts (after the top ad)
+                if (index > 0 && (index % 6 == 0)) {
+                  return const AdMobBannerCard(testMode: true);
+                }
+                // Calculate the correct post index, accounting for ads
+                final numAdsBefore = (index > 0) ? ((index) ~/ 6) : 0;
+                final postIndex = index - numAdsBefore - 1;
+                if (postIndex < 0 || postIndex >= displayList.length) return const SizedBox.shrink();
+                final sighting = displayList[postIndex];
                 return AuroraPostCard(
                   sighting: sighting,
                   onLike: (sightingId) async {

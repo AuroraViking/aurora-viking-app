@@ -81,6 +81,7 @@ dependencies:
   # Additional dependencies
   provider: ^6.1.2
   supabase_flutter: ^2.3.4
+  google_mobile_ads: ^6.0.0
 
 dev_dependencies:
   flutter_test:

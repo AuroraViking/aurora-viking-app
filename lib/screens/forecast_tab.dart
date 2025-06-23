@@ -15,6 +15,7 @@ import '../services/moon_service.dart';
 import '../widgets/forecast/cloud_forecast_map.dart';
 import '../services/auroral_power_service.dart';
 import '../widgets/forecast/auroral_power_chart.dart';
+import '../widgets/admob_banner_card.dart';
 
 class ForecastTab extends StatefulWidget {
   const ForecastTab({super.key});
@@ -584,6 +585,8 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                       isNowcast: true,
                     ),
                   const SizedBox(height: 20),
+                  // AdMob banner at the bottom of the forecast section
+                  AdMobBannerCard(testMode: true),
                 ],
               ),
             ),
