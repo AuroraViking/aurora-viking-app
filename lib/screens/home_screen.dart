@@ -322,17 +322,7 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
               ),
             ),
             actions: [
-              // Add debug button here (temporary for testing)
-              if (isAuthenticated)
-                IconButton(
-                  icon: const Icon(
-                    Icons.bug_report,
-                    color: Colors.orange,
-                    size: 24,
-                  ),
-                  onPressed: _openCameraDebug,
-                  tooltip: 'Camera Debug',
-                ),
+              // Removed debug button
               const Padding(
                 padding: EdgeInsets.only(right: 16),
                 child: UserBadge(),
@@ -417,11 +407,6 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
             },
           ),
           bottomNavigationBar: isAuthenticated ? _buildNavigationBar() : null,
-          floatingActionButton: FloatingActionButton(
-            onPressed: _refreshData,
-            backgroundColor: Colors.tealAccent,
-            child: const Icon(Icons.refresh),
-          ),
         );
       },
     );

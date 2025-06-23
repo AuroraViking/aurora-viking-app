@@ -201,11 +201,15 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
                       size: 16,
                     ),
                     const SizedBox(width: 8),
-                    Text(
-                      widget.photo.locationName,
-                      style: const TextStyle(
-                        color: Colors.white70,
-                        fontSize: 14,
+                    Expanded(
+                      child: Text(
+                        widget.photo.locationName,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                        maxLines: 1,
                       ),
                     ),
                     const Spacer(),
@@ -347,4 +351,4 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
       ),
     );
   }
-} 
+}

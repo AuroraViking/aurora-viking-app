@@ -219,15 +219,26 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
   }
 
   Widget _buildSightingsList(List<AuroraSighting> sightings) {
+    // Custom filter: always show at least the last 5, and if more than 5 in last 12 hours, show all from last 12 hours
+    final now = DateTime.now();
+    final twelveHoursAgo = now.subtract(const Duration(hours: 12));
+    final recent = sightings.where((s) => s.timestamp.isAfter(twelveHoursAgo)).toList();
+    List<AuroraSighting> displayList;
+    if (recent.length > 5) {
+      displayList = recent;
+    } else {
+      // Always show at least the last 5
+      displayList = List<AuroraSighting>.from(sightings.take(5));
+    }
     return RefreshIndicator(
       onRefresh: _refreshData,
       child: _isLoading
           ? const Center(child: CircularProgressIndicator())
           : ListView.builder(
               padding: const EdgeInsets.all(16),
-              itemCount: sightings.length,
+              itemCount: displayList.length,
               itemBuilder: (context, index) {
-                final sighting = sightings[index];
+                final sighting = displayList[index];
                 return AuroraPostCard(
                   sighting: sighting,
                   onLike: (sightingId) async {
@@ -235,9 +246,9 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
                       final result = await _firebaseService.confirmAuroraSighting(sightingId);
                       if (mounted) {
                         setState(() {
-                          final index = sightings.indexWhere((s) => s.id == sightingId);
-                          if (index != -1) {
-                            sightings[index] = sightings[index].copyWith(
+                          final idx = displayList.indexWhere((s) => s.id == sightingId);
+                          if (idx != -1) {
+                            displayList[idx] = displayList[idx].copyWith(
                               confirmations: result['confirmations'],
                               confirmedByUsers: result['verifications'],
                               isVerified: result['confirmations'] >= 3,
