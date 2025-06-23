@@ -195,21 +195,17 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
               children: [
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.location_on,
                       color: Colors.tealAccent,
                       size: 16,
                     ),
                     const SizedBox(width: 8),
-                    Expanded(
-                      child: Text(
-                        widget.photo.locationName,
-                        style: const TextStyle(
-                          color: Colors.white70,
-                          fontSize: 14,
-                        ),
-                        overflow: TextOverflow.ellipsis,
-                        maxLines: 1,
+                    Text(
+                      widget.photo.locationName,
+                      style: const TextStyle(
+                        color: Colors.white70,
+                        fontSize: 14,
                       ),
                     ),
                     const Spacer(),
@@ -225,7 +221,7 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
                 const SizedBox(height: 8),
                 Row(
                   children: [
-                    Icon(
+                    const Icon(
                       Icons.star,
                       color: Colors.amber,
                       size: 16,
@@ -352,3 +348,145 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
     );
   }
 }
+
+// Simple photo viewer for aurora sighting photos
+class AuroraSightingPhotoViewer extends StatelessWidget {
+  final List<String> photoUrls;
+  final int initialIndex;
+  final String locationName;
+  final String userName;
+  final String timeAgo;
+
+  const AuroraSightingPhotoViewer({
+    super.key,
+    required this.photoUrls,
+    this.initialIndex = 0,
+    required this.locationName,
+    required this.userName,
+    required this.timeAgo,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Scaffold(
+      backgroundColor: Colors.black,
+      appBar: AppBar(
+        backgroundColor: Colors.transparent,
+        elevation: 0,
+        leading: IconButton(
+          icon: const Icon(Icons.close, color: Colors.white),
+          onPressed: () => Navigator.pop(context),
+        ),
+        title: Text(
+          'Photo by $userName',
+          style: const TextStyle(color: Colors.white),
+        ),
+      ),
+      body: Column(
+        children: [
+          // Photo viewer with PageView for multiple photos
+          Expanded(
+            child: PageView.builder(
+              controller: PageController(initialPage: initialIndex),
+              itemCount: photoUrls.length,
+              itemBuilder: (context, index) {
+                return InteractiveViewer(
+                  minScale: 0.5,
+                  maxScale: 4.0,
+                  child: Center(
+                    child: Image.network(
+                      photoUrls[index],
+                      fit: BoxFit.contain,
+                      loadingBuilder: (context, child, loadingProgress) {
+                        if (loadingProgress == null) return child;
+                        return Center(
+                          child: CircularProgressIndicator(
+                            value: loadingProgress.expectedTotalBytes != null
+                                ? loadingProgress.cumulativeBytesLoaded / loadingProgress.expectedTotalBytes!
+                                : null,
+                            color: Colors.tealAccent,
+                          ),
+                        );
+                      },
+                      errorBuilder: (context, error, stackTrace) {
+                        return Center(
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              const Icon(
+                                Icons.error_outline,
+                                color: Colors.red,
+                                size: 48,
+                              ),
+                              const SizedBox(height: 16),
+                              const Text(
+                                'Failed to load image',
+                                style: TextStyle(color: Colors.white),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                    ),
+                  ),
+                );
+              },
+            ),
+          ),
+
+          // Photo info
+          Container(
+            padding: const EdgeInsets.all(16),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Row(
+                  children: [
+                    const Icon(
+                      Icons.location_on,
+                      color: Colors.tealAccent,
+                      size: 16,
+                    ),
+                    const SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        locationName,
+                        style: const TextStyle(
+                          color: Colors.white70,
+                          fontSize: 14,
+                        ),
+                        overflow: TextOverflow.ellipsis,
+                      ),
+                    ),
+                    Text(
+                      timeAgo,
+                      style: const TextStyle(
+                        color: Colors.white54,
+                        fontSize: 12,
+                      ),
+                    ),
+                  ],
+                ),
+                if (photoUrls.length > 1) ...[
+                  const SizedBox(height: 8),
+                  Row(
+                    mainAxisAlignment: MainAxisAlignment.center,
+                    children: [
+                      Text(
+                        '${initialIndex + 1} of ${photoUrls.length}',
+                        style: const TextStyle(
+                          color: Colors.white54,
+                          fontSize: 12,
+                        ),
+                      ),
+                    ],
+                  ),
+                ],
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+} 
