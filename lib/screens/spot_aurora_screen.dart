@@ -1,6 +1,5 @@
 // lib/screens/spot_aurora_screen.dart
 import 'package:flutter/material.dart';
-import 'package:flutter/services.dart';
 import 'package:image_picker/image_picker.dart';
 import 'camera_aurora_screen.dart';
 import 'package:geolocator/geolocator.dart';
@@ -92,78 +91,46 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
           style: TextStyle(color: Colors.white),
         ),
       ),
-      body: LayoutBuilder(
-        builder: (context, constraints) {
-          final isNarrow = constraints.maxWidth < 500;
-          return SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 24),
-            child: Center(
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const Text(
-                    'How would you like to share your aurora sighting?',
-                    style: TextStyle(
-                      color: Colors.white,
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                    ),
-                    textAlign: TextAlign.center,
-                  ),
-                  const SizedBox(height: 32),
-                  isNarrow
-                      ? Column(
-                          children: [
-                            _buildOptionButton(
-                              icon: Icons.camera_alt,
-                              label: 'Take Photo',
-                              onTap: _openCamera,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildOptionButton(
-                              icon: Icons.upload_file,
-                              label: 'Upload Photo',
-                              onTap: _uploadImage,
-                            ),
-                            const SizedBox(height: 16),
-                            _buildOptionButton(
-                              icon: Icons.location_on,
-                              label: 'Just Location',
-                              onTap: () {
-                                _showLocationDescriptionDialog();
-                              },
-                            ),
-                          ],
-                        )
-                      : Row(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          children: [
-                            _buildOptionButton(
-                              icon: Icons.camera_alt,
-                              label: 'Take Photo',
-                              onTap: _openCamera,
-                            ),
-                            const SizedBox(width: 24),
-                            _buildOptionButton(
-                              icon: Icons.upload_file,
-                              label: 'Upload Photo',
-                              onTap: _uploadImage,
-                            ),
-                            const SizedBox(width: 24),
-                            _buildOptionButton(
-                              icon: Icons.location_on,
-                              label: 'Just Location',
-                              onTap: () {
-                                _showLocationDescriptionDialog();
-                              },
-                            ),
-                          ],
-                        ),
-                ],
+      body: Center(
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Text(
+              'How would you like to share your aurora sighting?',
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
               ),
+              textAlign: TextAlign.center,
             ),
-          );
-        },
+            const SizedBox(height: 32),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                _buildOptionButton(
+                  icon: Icons.camera_alt,
+                  label: 'Take Photo',
+                  onTap: _openCamera,
+                ),
+                const SizedBox(width: 24),
+                _buildOptionButton(
+                  icon: Icons.upload_file,
+                  label: 'Upload Photo',
+                  onTap: _uploadImage,
+                ),
+                const SizedBox(width: 24),
+                _buildOptionButton(
+                  icon: Icons.location_on,
+                  label: 'Just Location',
+                  onTap: () {
+                    _showLocationDescriptionDialog();
+                  },
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -265,10 +232,38 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
   Future<void> _addLocationOnlySighting(String description, int intensity) async {
     try {
       final position = await _getCurrentPosition();
+      
+      // Get user's display name using the same logic as photo submission
+      final firebaseService = FirebaseService();
+      final userDoc = await firebaseService.firestore.collection('users').doc(firebaseService.currentUser?.uid).get();
+      String userDisplayName;
+      
+      if (userDoc.exists) {
+        userDisplayName = userDoc.data()?['displayName'] ?? 
+                         userDoc.data()?['userName'] ?? 
+                         firebaseService.currentUser?.displayName ?? 
+                         firebaseService.currentUser?.email?.split('@')[0] ?? 
+                         'Aurora Hunter';
+      } else {
+        userDisplayName = firebaseService.currentUser?.displayName ?? 
+                         firebaseService.currentUser?.email?.split('@')[0] ?? 
+                         'Aurora Hunter';
+        
+        // Create user profile
+        await firebaseService.firestore.collection('users').doc(firebaseService.currentUser?.uid).set({
+          'displayName': userDisplayName,
+          'email': firebaseService.currentUser?.email,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastActive': FieldValue.serverTimestamp(),
+          'auroraSpottingCount': 0,
+          'verificationCount': 0,
+        });
+      }
+      
       final sighting = AuroraSighting(
         id: '',
-        userId: FirebaseService().currentUser?.uid ?? '',
-        userName: FirebaseService().currentUser?.displayName ?? 'Anonymous',
+        userId: firebaseService.currentUser?.uid ?? '',
+        userName: userDisplayName,
         location: GeoPoint(position.latitude, position.longitude),
         locationName: 'Current Location', // TODO: Get location name from coordinates
         timestamp: DateTime.now(),
@@ -285,7 +280,7 @@ class _SpotAuroraScreenState extends State<SpotAuroraScreen> {
         commentCount: 0,
       );
 
-      await FirebaseService().addAuroraSighting(sighting);
+      await firebaseService.addAuroraSighting(sighting);
       if (!mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         const SnackBar(

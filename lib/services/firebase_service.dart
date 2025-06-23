@@ -354,7 +354,32 @@ class FirebaseService {
 
       // Get user's display name from their profile
       final userDoc = await firestore.collection('users').doc(currentUser!.uid).get();
-      final userDisplayName = userDoc.data()?['displayName'] ?? currentUser!.displayName ?? currentUser!.email?.split('@')[0] ?? 'Anonymous';
+      String userDisplayName;
+      
+      if (userDoc.exists) {
+        // Try to get display name from user profile
+        userDisplayName = userDoc.data()?['displayName'] ?? 
+                         userDoc.data()?['userName'] ?? 
+                         currentUser!.displayName ?? 
+                         currentUser!.email?.split('@')[0] ?? 
+                         'Aurora Hunter';
+      } else {
+        // Create user profile if it doesn't exist
+        userDisplayName = currentUser!.displayName ?? 
+                         currentUser!.email?.split('@')[0] ?? 
+                         'Aurora Hunter';
+        
+        // Create user profile
+        await firestore.collection('users').doc(currentUser!.uid).set({
+          'displayName': userDisplayName,
+          'email': currentUser!.email,
+          'createdAt': FieldValue.serverTimestamp(),
+          'lastActive': FieldValue.serverTimestamp(),
+          'auroraSpottingCount': 0,
+          'verificationCount': 0,
+        });
+      }
+      
       print('👤 User display name: $userDisplayName');
 
       // Create sighting document

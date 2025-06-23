@@ -12,6 +12,7 @@ class EditProfileScreen extends StatefulWidget {
 
 class _EditProfileScreenState extends State<EditProfileScreen> {
   final FirebaseService _firebaseService = FirebaseService();
+  final TextEditingController _displayNameController = TextEditingController();
   final TextEditingController _bioController = TextEditingController();
   File? _profileImage;
   File? _bannerImage;
@@ -27,6 +28,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
 
   @override
   void dispose() {
+    _displayNameController.dispose();
     _bioController.dispose();
     super.dispose();
   }
@@ -39,6 +41,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
         final doc = await _firebaseService.firestore.collection('users').doc(user.uid).get();
         if (doc.exists) {
           final data = doc.data() as Map<String, dynamic>;
+          _displayNameController.text = data['displayName'] ?? '';
           _bioController.text = data['bio'] ?? '';
           _currentProfileUrl = data['profilePictureUrl'];
           _currentBannerUrl = data['bannerUrl'];
@@ -94,6 +97,7 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
       if (user == null) throw Exception('User not authenticated');
 
       final updates = <String, dynamic>{
+        'displayName': _displayNameController.text,
         'bio': _bioController.text,
         'lastUpdated': DateTime.now(),
       };
@@ -235,6 +239,21 @@ class _EditProfileScreenState extends State<EditProfileScreen> {
                   ),
 
                   const SizedBox(height: 20),
+
+                  // Display Name
+                  Padding(
+                    padding: const EdgeInsets.all(16),
+                    child: TextField(
+                      controller: _displayNameController,
+                      decoration: InputDecoration(
+                        labelText: 'Display Name',
+                        hintText: 'Enter your display name',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(12),
+                        ),
+                      ),
+                    ),
+                  ),
 
                   // Bio
                   Padding(

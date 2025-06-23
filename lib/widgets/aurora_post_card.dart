@@ -212,6 +212,8 @@ Shared via Aurora Viking App
               child: Text(
                 widget.sighting.description!,
                 style: const TextStyle(color: Colors.white),
+                overflow: TextOverflow.ellipsis,
+                maxLines: 5,
               ),
             ),
 
@@ -223,9 +225,12 @@ Shared via Aurora Viking App
                 children: [
                   const Icon(Icons.cloud, color: Colors.white70),
                   const SizedBox(width: 8),
-                  Text(
-                    'BzH: ${widget.sighting.weather['bzH']?.toStringAsFixed(1) ?? 'N/A'} nT • Kp: ${widget.sighting.weather['kp']?.toStringAsFixed(1) ?? 'N/A'}',
-                    style: const TextStyle(color: Colors.white70),
+                  Expanded(
+                    child: Text(
+                      'BzH: ${widget.sighting.weather['bzH']?.toStringAsFixed(1) ?? 'N/A'} nT • Kp: ${widget.sighting.weather['kp']?.toStringAsFixed(1) ?? 'N/A'}',
+                      style: const TextStyle(color: Colors.white70),
+                      overflow: TextOverflow.ellipsis,
+                    ),
                   ),
                 ],
               ),
@@ -238,9 +243,12 @@ Shared via Aurora Viking App
               children: [
                 const Icon(Icons.star, color: Colors.amber),
                 const SizedBox(width: 8),
-                Text(
-                  'Intensity: ${widget.sighting.intensity}',
-                  style: const TextStyle(color: Colors.white70),
+                Expanded(
+                  child: Text(
+                    'Intensity: ${widget.sighting.intensity}',
+                    style: const TextStyle(color: Colors.white70),
+                    overflow: TextOverflow.ellipsis,
+                  ),
                 ),
               ],
             ),
@@ -253,9 +261,13 @@ Shared via Aurora Viking App
               children: [
                 const Icon(Icons.location_on, color: Colors.white70),
                 const SizedBox(width: 8),
-                Text(
-                  '${widget.sighting.locationName} (${widget.sighting.location.latitude.toStringAsFixed(2)}, ${widget.sighting.location.longitude.toStringAsFixed(2)})',
-                  style: const TextStyle(color: Colors.white70),
+                Expanded(
+                  child: Text(
+                    '${widget.sighting.locationName} (${widget.sighting.location.latitude.toStringAsFixed(2)}, ${widget.sighting.location.longitude.toStringAsFixed(2)})',
+                    style: const TextStyle(color: Colors.white70),
+                    overflow: TextOverflow.ellipsis,
+                    maxLines: 2,
+                  ),
                 ),
               ],
             ),
@@ -437,6 +449,8 @@ Shared via Aurora Viking App
                     color: Colors.white,
                     fontWeight: FontWeight.bold,
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
                 Text(
                   widget.sighting.timeAgo,
@@ -444,6 +458,8 @@ Shared via Aurora Viking App
                     color: Colors.white70,
                     fontSize: 12,
                   ),
+                  overflow: TextOverflow.ellipsis,
+                  maxLines: 1,
                 ),
               ],
             ),

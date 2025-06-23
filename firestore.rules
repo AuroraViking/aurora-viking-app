@@ -84,9 +84,10 @@ service cloud.firestore {
       );
     }
 
-    // Blocked users collection — only admins can manage blocked users
+    // Blocked users collection — users can read their own status, admins can read all and manage
     match /blocked_users/{userId} {
-      allow read, write, delete: if isAuthenticated() && isAdmin();
+      allow read: if isAuthenticated() && (request.auth.uid == userId || isAdmin());
+      allow write, delete: if isAuthenticated() && isAdmin();
     }
 
     // Allow users to read their own admin doc

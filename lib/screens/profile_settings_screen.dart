@@ -2,13 +2,9 @@ import 'package:flutter/material.dart';
 import 'package:image_picker/image_picker.dart';
 import 'dart:io';
 import '../services/firebase_service.dart';
-import 'tour_auth_screen.dart';
 import 'my_photos_tab.dart';
-import 'package:url_launcher/url_launcher.dart';
-import 'package:url_launcher/url_launcher_string.dart';
 import 'edit_profile_screen.dart';
-import 'notification_settings_screen.dart';
-import 'privacy_settings_screen.dart';
+import 'package:url_launcher/url_launcher.dart';
 
 class ProfileSettingsScreen extends StatefulWidget {
   const ProfileSettingsScreen({super.key});
@@ -59,10 +55,8 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         setState(() => _isLoading = true);
         final file = File(pickedFile.path);
         final url = await _firebaseService.updateProfilePicture(file);
-        if (url != null) {
-          setState(() => _profilePictureUrl = url);
-        }
-      }
+        setState(() => _profilePictureUrl = url);
+            }
     } catch (e) {
       print('❌ Failed to pick/upload image: $e');
     } finally {
@@ -244,7 +238,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                             MaterialPageRoute(
                               builder: (context) => const EditProfileScreen(),
                             ),
-                          ).then((_) => _loadUserData());
+                          );
                         },
                       ),
                       _buildSettingsItem(
@@ -253,12 +247,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                         Icons.notifications,
                         Colors.orangeAccent,
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const NotificationSettingsScreen(),
-                            ),
-                          );
+                          // TODO: Implement notification settings
                         },
                       ),
                       _buildSettingsItem(
@@ -267,14 +256,19 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                         Icons.privacy_tip,
                         Colors.purpleAccent,
                         onTap: () {
-                          Navigator.push(
-                            context,
-                            MaterialPageRoute(
-                              builder: (context) => const PrivacySettingsScreen(),
-                            ),
-                          );
+                          // TODO: Implement privacy settings
                         },
                       ),
+                      if (userType != 'tour_participant')
+                        _buildSettingsItem(
+                          context,
+                          'Verify Tour Booking',
+                          Icons.card_travel,
+                          Colors.tealAccent,
+                          onTap: () {
+                            _showVerifyTourDialog(context);
+                          },
+                        ),
                       if (userType == 'tour_participant')
                         _buildSettingsItem(
                           context,
@@ -317,7 +311,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text(
+                          const Text(
                             'Want to join the creators of this app on a Northern Lights tour?\nAre you going to Iceland or would you like to go? ',
                             style: TextStyle(
                               color: Colors.tealAccent,
@@ -513,4 +507,4 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
       ),
     );
   }
-}
+} 
