@@ -371,84 +371,80 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
                     ),
                   ),
                   const SizedBox(height: 16),
-                  // Auroral Power Tracker
-                  Container(
-                    margin: const EdgeInsets.symmetric(horizontal: 16),
-                    padding: const EdgeInsets.all(16),
-                    decoration: BoxDecoration(
-                      color: Colors.white.withOpacity(0.05),
-                      borderRadius: BorderRadius.circular(16),
-                      border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
-                    ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Row(
-                          children: [
-                            Icon(
-                              Icons.flash_on,
-                              color: Colors.amber,
-                              size: 24,
-                            ),
-                            SizedBox(width: 8),
-                            Text(
-                              'Auroral Power Tracker',
-                              style: TextStyle(
-                                color: Colors.white,
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
-                        ),
-                        const SizedBox(height: 16),
-                        
-                        // Simplified status display
-                        StreamBuilder<Map<String, dynamic>>(
-                          stream: _auroralPowerService.auroralPowerStream,
-                          builder: (context, snapshot) {
-                            if (!snapshot.hasData) {
-                              return const Center(
-                                child: CircularProgressIndicator(color: Colors.tealAccent),
-                              );
-                            }
-                            
-                            final data = snapshot.data!;
-                            final currentPower = data['currentPower'] ?? 0.0;
-                            
-                            return Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  _auroralPowerService.getAuroralPowerDescription(currentPower),
-                                  style: const TextStyle(
-                                    color: Colors.amber,
-                                    fontSize: 16,
-                                    fontWeight: FontWeight.w500,
-                                  ),
-                                ),
-                                const SizedBox(height: 8),
-                                Text(
-                                  'Current Power: ${currentPower.toStringAsFixed(1)} GW',
-                                  style: const TextStyle(color: Colors.white70),
-                                ),
-                                const SizedBox(height: 16),
-                                
-                                // The chart with proper service connection
-                                SizedBox(
-                                  height: 200,
-                                  child: AuroraPowerChart(
-                                    data: const [], // Start with empty data - let the service populate it
-                                    service: _auroralPowerService,
-                                  ),
-                                ),
-                              ],
-                            );
-                          },
-                        ),
-                      ],
-                    ),
-                  ),
+                  // Auroral Power Tracker (HIDDEN FOR APP STORE LAUNCH)
+                  // Container(
+                  //   margin: const EdgeInsets.symmetric(horizontal: 16),
+                  //   padding: const EdgeInsets.all(16),
+                  //   decoration: BoxDecoration(
+                  //     color: Colors.white.withOpacity(0.05),
+                  //     borderRadius: BorderRadius.circular(16),
+                  //     border: Border.all(color: Colors.tealAccent.withOpacity(0.3)),
+                  //   ),
+                  //   child: Column(
+                  //     crossAxisAlignment: CrossAxisAlignment.start,
+                  //     children: [
+                  //       const Row(
+                  //         children: [
+                  //           Icon(
+                  //             Icons.flash_on,
+                  //             color: Colors.amber,
+                  //             size: 24,
+                  //           ),
+                  //           SizedBox(width: 8),
+                  //           Text(
+                  //             'Auroral Power Tracker',
+                  //             style: TextStyle(
+                  //               color: Colors.white,
+                  //               fontSize: 18,
+                  //               fontWeight: FontWeight.bold,
+                  //             ),
+                  //           ),
+                  //         ],
+                  //       ),
+                  //       const SizedBox(height: 16),
+                  //       // Simplified status display
+                  //       StreamBuilder<Map<String, dynamic>>(
+                  //         stream: _auroralPowerService.auroralPowerStream,
+                  //         builder: (context, snapshot) {
+                  //           if (!snapshot.hasData) {
+                  //             return const Center(
+                  //               child: CircularProgressIndicator(color: Colors.tealAccent),
+                  //             );
+                  //           }
+                  //           final data = snapshot.data!;
+                  //           final currentPower = data['currentPower'] ?? 0.0;
+                  //           return Column(
+                  //             crossAxisAlignment: CrossAxisAlignment.start,
+                  //             children: [
+                  //               Text(
+                  //                 _auroralPowerService.getAuroralPowerDescription(currentPower),
+                  //                 style: const TextStyle(
+                  //                   color: Colors.amber,
+                  //                   fontSize: 16,
+                  //                   fontWeight: FontWeight.w500,
+                  //                 ),
+                  //               ),
+                  //               const SizedBox(height: 8),
+                  //               Text(
+                  //                 'Current Power:  24{currentPower.toStringAsFixed(1)} GW',
+                  //                 style: const TextStyle(color: Colors.white70),
+                  //               ),
+                  //               const SizedBox(height: 16),
+                  //               // The chart with proper service connection
+                  //               SizedBox(
+                  //                 height: 200,
+                  //                 child: AuroraPowerChart(
+                  //                   data: const [], // Start with empty data - let the service populate it
+                  //                   service: _auroralPowerService,
+                  //                 ),
+                  //               ),
+                  //             ],
+                  //           );
+                  //         },
+                  //       ),
+                  //     ],
+                  //   ),
+                  // ),
                   const SizedBox(height: 16),
                   // Data Box
                   Container(

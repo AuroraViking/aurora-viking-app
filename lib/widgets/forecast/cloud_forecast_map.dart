@@ -204,199 +204,201 @@ class _CloudForecastMapState extends State<CloudForecastMap> {
   @override
   Widget build(BuildContext context) {
     final screenHeight = MediaQuery.of(context).size.height;
-    final mapHeight = screenHeight * 0.7; // Reduced from 0.8 to 0.7 to prevent overflow
+    final mapHeight = screenHeight * 0.6; // Reduced from 0.7 to 0.6 to prevent overflow
     
-    return Column(
-      crossAxisAlignment: CrossAxisAlignment.start,
-      children: [
-        Container(
-          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-          padding: const EdgeInsets.all(12),
-          decoration: BoxDecoration(
-            color: Colors.black.withOpacity(0.7),
-            borderRadius: BorderRadius.circular(12),
-            border: Border.all(
-              color: Colors.tealAccent.withOpacity(0.3),
+    return Expanded(
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+            padding: const EdgeInsets.all(12),
+            decoration: BoxDecoration(
+              color: Colors.black.withOpacity(0.7),
+              borderRadius: BorderRadius.circular(12),
+              border: Border.all(
+                color: Colors.tealAccent.withOpacity(0.3),
+              ),
             ),
-          ),
-          child: Row(
-            children: [
-              Icon(Icons.info_outline, color: Colors.tealAccent, size: 20),
-              const SizedBox(width: 12),
-              Expanded(
-                child: Text(
-                  'After panning to a new location, the app will generate a custom cloud cover forecast for that area. This process may take up to 60 seconds. The forecast will update automatically when you stop moving the map.',
-                  style: TextStyle(
-                    color: Colors.white.withOpacity(0.9),
-                    fontSize: 13,
-                    height: 1.4,
+            child: Row(
+              children: [
+                Icon(Icons.info_outline, color: Colors.tealAccent, size: 20),
+                const SizedBox(width: 12),
+                Expanded(
+                  child: Text(
+                    'After panning to a new location, the app will generate a custom cloud cover forecast for that area. This process may take up to 60 seconds. The forecast will update automatically when you stop moving the map.',
+                    style: TextStyle(
+                      color: Colors.white.withOpacity(0.9),
+                      fontSize: 13,
+                      height: 1.4,
+                    ),
                   ),
                 ),
-              ),
-            ],
-          ),
-        ),
-        Container(
-          height: mapHeight,
-          margin: const EdgeInsets.only(bottom: 8), // Reduced bottom margin
-          decoration: BoxDecoration(
-            borderRadius: const BorderRadius.only(
-              topLeft: Radius.circular(20),
-              topRight: Radius.circular(20),
+              ],
             ),
-            border: Border.all(
-              color: Colors.tealAccent.withOpacity(0.3),
-              width: 1,
-            ),
-            boxShadow: [
-              BoxShadow(
-                color: Colors.black.withOpacity(0.5),
-                blurRadius: 10,
-                offset: const Offset(0, -4),
-              ),
-            ],
           ),
-          child: Stack(
-            children: [
-              ClipRRect(
-                borderRadius: const BorderRadius.only(
-                  topLeft: Radius.circular(20),
-                  topRight: Radius.circular(20),
+          Container(
+            height: mapHeight,
+            margin: const EdgeInsets.only(bottom: 0), // Remove bottom margin to prevent overflow
+            decoration: BoxDecoration(
+              borderRadius: const BorderRadius.only(
+                topLeft: Radius.circular(20),
+                topRight: Radius.circular(20),
+              ),
+              border: Border.all(
+                color: Colors.tealAccent.withOpacity(0.3),
+                width: 1,
+              ),
+              boxShadow: [
+                BoxShadow(
+                  color: Colors.black.withOpacity(0.5),
+                  blurRadius: 10,
+                  offset: const Offset(0, -4),
                 ),
-                child: GoogleMap(
-                  initialCameraPosition: CameraPosition(
-                    target: _currentCenter,
-                    zoom: _currentZoom,
+              ],
+            ),
+            child: Stack(
+              children: [
+                ClipRRect(
+                  borderRadius: const BorderRadius.only(
+                    topLeft: Radius.circular(20),
+                    topRight: Radius.circular(20),
                   ),
-                  onMapCreated: (controller) {
-                    setState(() {
-                      _mapController = controller;
-                      _isMapLoading = false;
-                    });
-                  },
-                  myLocationEnabled: true,
-                  myLocationButtonEnabled: true,
-                  zoomControlsEnabled: true,
-                  mapToolbarEnabled: false,
-                  mapType: MapType.terrain,
-                  polygons: _cloudPolygons,
-                  onCameraMove: (position) {
-                    setState(() {
-                      _currentCenter = position.target;
-                      _currentZoom = position.zoom;
-                    });
-                  },
-                  onCameraIdle: () {
-                    _loadForecast();
-                  },
+                  child: GoogleMap(
+                    initialCameraPosition: CameraPosition(
+                      target: _currentCenter,
+                      zoom: _currentZoom,
+                    ),
+                    onMapCreated: (controller) {
+                      setState(() {
+                        _mapController = controller;
+                        _isMapLoading = false;
+                      });
+                    },
+                    myLocationEnabled: true,
+                    myLocationButtonEnabled: true,
+                    zoomControlsEnabled: true,
+                    mapToolbarEnabled: false,
+                    mapType: MapType.terrain,
+                    polygons: _cloudPolygons,
+                    onCameraMove: (position) {
+                      setState(() {
+                        _currentCenter = position.target;
+                        _currentZoom = position.zoom;
+                      });
+                    },
+                    onCameraIdle: () {
+                      _loadForecast();
+                    },
+                  ),
                 ),
-              ),
-              if (_isMapLoading || _isLoadingForecast)
+                if (_isMapLoading || _isLoadingForecast)
+                  Positioned(
+                    top: 16,
+                    left: 16,
+                    right: 16,
+                    child: Container(
+                      padding: const EdgeInsets.all(8),
+                      decoration: BoxDecoration(
+                        color: Colors.black.withOpacity(0.7),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: const Row(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          CircularProgressIndicator(
+                            color: Colors.tealAccent,
+                          ),
+                          SizedBox(width: 16),
+                          Text(
+                            'Loading forecast data...',
+                            style: TextStyle(
+                              color: Colors.white,
+                              fontSize: 14,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
                 Positioned(
-                  top: 16,
+                  bottom: 0, // Move to very bottom to prevent overflow
                   left: 16,
                   right: 16,
                   child: Container(
-                    padding: const EdgeInsets.all(8),
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(8),
+                      borderRadius: BorderRadius.circular(12),
+                      border: Border.all(
+                        color: Colors.tealAccent.withOpacity(0.3),
+                      ),
                     ),
-                    child: const Row(
+                    child: Column(
                       mainAxisSize: MainAxisSize.min,
                       children: [
-                        CircularProgressIndicator(
-                          color: Colors.tealAccent,
-                        ),
-                        SizedBox(width: 16),
                         Text(
-                          'Loading forecast data...',
-                          style: TextStyle(
+                          _getTimeLabel(),
+                          style: const TextStyle(
                             color: Colors.white,
                             fontSize: 14,
+                            fontWeight: FontWeight.bold,
                           ),
+                        ),
+                        const SizedBox(height: 8),
+                        _buildTimeLabels(),
+                        const SizedBox(height: 4),
+                        Stack(
+                          children: [
+                            SizedBox(
+                              height: 20,
+                              child: Row(
+                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                children: List.generate(49, (index) {
+                                  return Container(
+                                    width: 1,
+                                    height: 8,
+                                    color: Colors.tealAccent.withOpacity(0.5),
+                                  );
+                                }),
+                              ),
+                            ),
+                            SliderTheme(
+                              data: SliderThemeData(
+                                activeTrackColor: Colors.tealAccent,
+                                inactiveTrackColor: Colors.tealAccent.withOpacity(0.3),
+                                thumbColor: Colors.tealAccent,
+                                overlayColor: Colors.tealAccent.withOpacity(0.2),
+                                valueIndicatorColor: Colors.tealAccent,
+                                valueIndicatorTextStyle: const TextStyle(
+                                  color: Colors.black,
+                                  fontSize: 12,
+                                ),
+                                trackHeight: 4,
+                                activeTickMarkColor: Colors.tealAccent,
+                                inactiveTickMarkColor: Colors.tealAccent.withOpacity(0.3),
+                                tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 4),
+                              ),
+                              child: Slider(
+                                value: _timeOffset,
+                                min: 0,
+                                max: 96,
+                                divisions: 96,
+                                label: _getTimeLabel(),
+                                onChanged: _updateTimeOffset,
+                              ),
+                            ),
+                          ],
                         ),
                       ],
                     ),
                   ),
                 ),
-              Positioned(
-                bottom: 8, // Reduced from 16 to 8
-                left: 16,
-                right: 16,
-                child: Container(
-                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-                  decoration: BoxDecoration(
-                    color: Colors.black.withOpacity(0.7),
-                    borderRadius: BorderRadius.circular(12),
-                    border: Border.all(
-                      color: Colors.tealAccent.withOpacity(0.3),
-                    ),
-                  ),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Text(
-                        _getTimeLabel(),
-                        style: const TextStyle(
-                          color: Colors.white,
-                          fontSize: 14,
-                          fontWeight: FontWeight.bold,
-                        ),
-                      ),
-                      const SizedBox(height: 8),
-                      _buildTimeLabels(),
-                      const SizedBox(height: 4),
-                      Stack(
-                        children: [
-                          SizedBox(
-                            height: 20,
-                            child: Row(
-                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                              children: List.generate(49, (index) {
-                                return Container(
-                                  width: 1,
-                                  height: 8,
-                                  color: Colors.tealAccent.withOpacity(0.5),
-                                );
-                              }),
-                            ),
-                          ),
-                          SliderTheme(
-                            data: SliderThemeData(
-                              activeTrackColor: Colors.tealAccent,
-                              inactiveTrackColor: Colors.tealAccent.withOpacity(0.3),
-                              thumbColor: Colors.tealAccent,
-                              overlayColor: Colors.tealAccent.withOpacity(0.2),
-                              valueIndicatorColor: Colors.tealAccent,
-                              valueIndicatorTextStyle: const TextStyle(
-                                color: Colors.black,
-                                fontSize: 12,
-                              ),
-                              trackHeight: 4,
-                              activeTickMarkColor: Colors.tealAccent,
-                              inactiveTickMarkColor: Colors.tealAccent.withOpacity(0.3),
-                              tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 4),
-                            ),
-                            child: Slider(
-                              value: _timeOffset,
-                              min: 0,
-                              max: 96,
-                              divisions: 96,
-                              label: _getTimeLabel(),
-                              onChanged: _updateTimeOffset,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ],
-                  ),
-                ),
-              ),
-            ],
+              ],
+            ),
           ),
-        ),
-      ],
+        ],
+      ),
     );
   }
 
@@ -473,4 +475,4 @@ class _CloudForecastMapState extends State<CloudForecastMap> {
     _mapController?.dispose();
     super.dispose();
   }
-} 
+}
