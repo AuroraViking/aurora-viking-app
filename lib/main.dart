@@ -113,40 +113,40 @@ void _validateEnvironmentVariables() {
 
   if (missingKeys.isNotEmpty) {
     // ignore: avoid_print
-    print('❌ MISSING ENVIRONMENT VARIABLES:');
+    // print('❌ MISSING ENVIRONMENT VARIABLES:');
     for (String key in missingKeys) {
       // ignore: avoid_print
-      print('   • $key');
+      // print('   • $key');
     }
   }
 
   if (emptyKeys.isNotEmpty) {
     // ignore: avoid_print
-    print('⚠️ PLACEHOLDER VALUES DETECTED:');
+    // print('⚠️ PLACEHOLDER VALUES DETECTED:');
     for (String key in emptyKeys) {
       // ignore: avoid_print
-      print('   • $key: "${dotenv.env[key]}"');
+      // print('   • $key: "${dotenv.env[key]}"');
     }
   }
 
   if (missingKeys.isNotEmpty || emptyKeys.isNotEmpty) {
     // ignore: avoid_print
-    print('📋 Please update your .env file with real API keys');
+    // print('📋 Please update your .env file with real API keys');
     // ignore: avoid_print
-    print('📄 Copy .env.example to .env and fill in your values');
+    // print('📄 Copy .env.example to .env and fill in your values');
     throw Exception('Environment variables not properly configured');
   }
 
   // Debug info (remove in production)
   // ignore: avoid_print
-  print('🔧 Environment loaded:');
+  // print('🔧 Environment loaded:');
   for (String key in requiredKeys) {
     final value = dotenv.env[key]!;
     final masked = value.length > 10
         ? '${value.substring(0, 6)}...${value.substring(value.length - 4)}'
         : '***';
     // ignore: avoid_print
-    print('   $key: $masked');
+    // print('   $key: $masked');
   }
 }
 
@@ -222,7 +222,7 @@ class MyApp extends StatelessWidget {
         ),
       ),
       themeMode: ThemeMode.system,
-      home: const HomeScreen(),
+      home: const HomeScreen(), // Ensure this is set
       debugShowCheckedModeBanner: false,
     );
   }

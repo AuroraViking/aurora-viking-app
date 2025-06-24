@@ -39,7 +39,7 @@ class AuroralPowerService {
     if (_isInitialized || _isInitializing) return;
 
     _isInitializing = true;
-    print('🚀 Initializing Candy-Powered AuroralPowerService (Database-Only Mode)...');
+    // print('🚀 Initializing Candy-Powered AuroralPowerService (Database-Only Mode)...');
 
     try {
       // Load delicious data from database (maintained by Edge Function)
@@ -52,13 +52,13 @@ class AuroralPowerService {
       _setupRealtimeSubscription();
 
       _isInitialized = true;
-      print('✅ Candy-Powered AuroralPowerService initialized with ${_historicalData.length} sweet data points');
+      // print('✅ Candy-Powered AuroralPowerService initialized with \\${_historicalData.length} sweet data points');
 
       // Emit initial candy rush
       _emitCurrentData();
 
     } catch (e) {
-      print('❌ Service initialization failed (probably ran out of candy): $e');
+      // print('❌ Service initialization failed (probably ran out of candy): $e');
       _isInitializing = false;
       rethrow;
     }
@@ -68,7 +68,7 @@ class AuroralPowerService {
 
   Future<void> _loadDataFromDatabase() async {
     try {
-      print('📋 Loading aurora candy from database...');
+      // print('📋 Loading aurora candy from database...');
 
       final response = await _supabase
           .from('aurora_readings')
@@ -84,28 +84,28 @@ class AuroralPowerService {
           final power = double.parse(row['power'].toString());
           _historicalData.add(AuroraPowerPoint(time, power));
         } catch (e) {
-          print('⚠️ Error parsing candy-flavored database row: $e');
+          // print('⚠️ Error parsing candy-flavored database row: $e');
           continue;
         }
       }
 
-      print('📋 Loaded ${_historicalData.length} delicious data points from database');
+      // print('📋 Loaded \\${_historicalData.length} delicious data points from database');
 
       // If no candy data, try to trigger the magical Edge Function
       if (_historicalData.isEmpty) {
-        print('⚠️ No candy in database. Attempting to summon Edge Function...');
+        // print('⚠️ No candy in database. Attempting to summon Edge Function...');
         await _triggerEdgeFunction();
       }
 
     } catch (e) {
-      print('❌ Error loading candy data from database: $e');
+      // print('❌ Error loading candy data from database: $e');
       rethrow;
     }
   }
 
   Future<void> _triggerEdgeFunction() async {
     try {
-      print('🔄 Triggering Edge Function to collect initial candy...');
+      // print('🔄 Triggering Edge Function to collect initial candy...');
 
       final response = await _supabase.functions.invoke(
         'aurora-collector',
@@ -113,24 +113,24 @@ class AuroralPowerService {
       );
 
       if (response.data != null && response.data['success'] == true) {
-        print('✅ Edge Function triggered successfully: ${response.data['aurora_power']} GW of pure candy energy');
+        // print('✅ Edge Function triggered successfully: \\${response.data['aurora_power']} GW of pure candy energy');
 
         // Wait for the candy to process
         await Future.delayed(const Duration(seconds: 3));
         await _loadDataFromDatabase();
       } else {
-        print('⚠️ Edge Function returned: ${response.data}');
+        // print('⚠️ Edge Function returned: \\${response.data}');
       }
 
     } catch (e) {
-      print('⚠️ Could not trigger Edge Function (maybe it needs more candy): $e');
+      // print('⚠️ Could not trigger Edge Function (maybe it needs more candy): $e');
       // Continue without triggering - data will come from cron job candy delivery
     }
   }
 
   void _setupRealtimeSubscription() {
     try {
-      print('🔔 Setting up real-time candy delivery subscription...');
+      // print('🔔 Setting up real-time candy delivery subscription...');
 
       _supabase
           .channel('aurora_candy_changes')
@@ -139,14 +139,14 @@ class AuroralPowerService {
         schema: 'public',
         table: 'aurora_readings',
         callback: (payload) {
-          print('📡 New candy delivered via real-time subscription');
+          // print('📡 New candy delivered via real-time subscription');
           _handleRealtimeUpdate(payload);
         },
       )
           .subscribe();
 
     } catch (e) {
-      print('⚠️ Could not set up real-time candy subscription: $e');
+      // print('⚠️ Could not set up real-time candy subscription: $e');
       // Continue without real-time - periodic candy checks will still work
     }
   }
@@ -170,10 +170,10 @@ class AuroralPowerService {
 
         // Emit updated candy data
         _emitCurrentData();
-        print('🔄 Real-time candy update: ${power.toStringAsFixed(1)} GW at ${time.toLocal()}');
+        // print('🔄 Real-time candy update: \\${power.toStringAsFixed(1)} GW at \\${time.toLocal()}');
       }
     } catch (e) {
-      print('⚠️ Error handling real-time candy update: $e');
+      // print('⚠️ Error handling real-time candy update: $e');
     }
   }
 
@@ -185,12 +185,12 @@ class AuroralPowerService {
         try {
           await _checkForUpdates();
         } catch (e) {
-          print('⚠️ Periodic candy check failed: $e');
+          // print('⚠️ Periodic candy check failed: $e');
         }
       }
     });
 
-    print('⏰ Started periodic candy checks every ${_updateInterval.inMinutes} minute(s)');
+    // print('⏰ Started periodic candy checks every \\${_updateInterval.inMinutes} minute(s)');
   }
 
   Future<void> _checkForUpdates() async {
@@ -218,7 +218,7 @@ class AuroralPowerService {
       }
 
       if (newDataRows.isNotEmpty) {
-        print('📡 Found ${newDataRows.length} new candy data points');
+        // print('📡 Found \\${newDataRows.length} new candy data points');
 
         for (var row in newDataRows) {
           try {
@@ -226,7 +226,7 @@ class AuroralPowerService {
             final power = double.parse(row['power'].toString());
             _historicalData.add(AuroraPowerPoint(time, power));
           } catch (e) {
-            print('⚠️ Error parsing new candy data point: $e');
+            // print('⚠️ Error parsing new candy data point: $e');
             continue;
           }
         }
@@ -242,7 +242,7 @@ class AuroralPowerService {
       }
 
     } catch (e) {
-      print('⚠️ Error checking for candy updates: $e');
+      // print('⚠️ Error checking for candy updates: $e');
     }
   }
 
@@ -265,9 +265,9 @@ class AuroralPowerService {
     try {
       await _loadDataFromDatabase();
       _emitCurrentData();
-      print('🔄 Manual candy refresh completed');
+      // print('🔄 Manual candy refresh completed');
     } catch (e) {
-      print('❌ Manual candy refresh failed: $e');
+      // print('❌ Manual candy refresh failed: $e');
       rethrow;
     }
   }
@@ -339,6 +339,6 @@ class AuroralPowerService {
     // Close real-time candy subscription
     _supabase.removeAllChannels();
 
-    print('🛑 Candy-Powered AuroralPowerService disposed (all candy consumed)');
+    // print('🛑 Candy-Powered AuroralPowerService disposed (all candy consumed)');
   }
 }

@@ -55,7 +55,7 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
         });
       }
     } catch (e) {
-      print('Error loading photo stats: $e');
+      // print('Error loading photo stats: $e');
     }
   }
 
@@ -77,7 +77,7 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
             .toList();
       });
     } catch (e) {
-      print('Error loading comments: $e');
+      // print('Error loading comments: $e');
     }
   }
 
@@ -89,7 +89,7 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
         _likeCount = result['confirmations'];
       });
     } catch (e) {
-      print('Error handling like: $e');
+      // print('Error handling like: $e');
     }
   }
 
@@ -105,7 +105,7 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
       await _loadComments();
       await _loadPhotoStats();
     } catch (e) {
-      print('Error adding comment: $e');
+      // print('Error adding comment: $e');
     }
   }
 
@@ -126,7 +126,7 @@ class _AuroraPhotoViewerState extends State<AuroraPhotoViewer> {
         Navigator.pop(context);
       }
     } catch (e) {
-      print('Error deleting photo: $e');
+      // print('Error deleting photo: $e');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -489,4 +489,4 @@ class AuroraSightingPhotoViewer extends StatelessWidget {
       ),
     );
   }
-} 
+}

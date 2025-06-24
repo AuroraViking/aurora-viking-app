@@ -164,8 +164,8 @@ class UrlTileProvider implements TileProvider {
         return Tile(x, y, response.bodyBytes);
       }
     } catch (e) {
-      print('Error loading tile: $e');
+      // print('Error loading tile: $e');
     }
     return TileProvider.noTile;
   }
-} 
+}

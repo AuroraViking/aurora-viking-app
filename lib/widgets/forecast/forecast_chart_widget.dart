@@ -538,8 +538,9 @@ class _ForecastChartWidgetState extends State<ForecastChartWidget> with SingleTi
   }
 
   double _getYLimit(List<double> values) {
-    if (values.isEmpty) return 10;
-    final absMax = values.map((e) => e.abs()).fold<double>(0, (a, b) => a > b ? a : b);
+    // Use Bt values for autoscaling instead of Bz
+    if (widget.btValues.isEmpty) return 10;
+    final absMax = widget.btValues.map((e) => e.abs()).fold<double>(0, (a, b) => a > b ? a : b);
     if (absMax <= 5) return 5;
     if (absMax <= 10) return 10;
     if (absMax <= 20) return 20;

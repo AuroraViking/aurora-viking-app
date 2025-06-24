@@ -1,5 +1,5 @@
-// android/app/src/main/kotlin/com/example/aurora_viking_app/AuroraCameraPlugin.kt
-package com.example.aurora_viking_app
+// android/app/src/main/kotlin/com/aurora_viking/app/AuroraCameraPlugin.kt
+package com.auroraviking.app
 
 import android.Manifest
 import android.annotation.SuppressLint
@@ -390,13 +390,19 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
         try {
             Log.d(TAG, "Applying camera settings:")
             Log.d(TAG, "  Requested - ISO: $iso, Exposure: ${exposureSeconds}s, Focus: $focusDistance, AutoFocus: $useAutoFocus")
-            
+
+            if (!supportsManualSensor) {
+                Log.w(TAG, "Manual sensor controls not supported on this device.")
+                result.error("MANUAL_UNSUPPORTED", "Manual camera controls are not supported on this device.", null)
+                return
+            }
+
             // Clamp values to supported ranges with logging
             val clampedISO = isoRange?.clamp(iso) ?: iso
             val exposureNs = (exposureSeconds * 1_000_000_000L).toLong()
             val clampedExposureNs = exposureTimeRange?.clamp(exposureNs) ?: exposureNs
-            // Convert meters to diopters for manual focus
-            val focusDiopters = if (focusDistance >= 1000f) 0.0f else (1.0f / focusDistance)
+            // Convert meters to diopters for manual focus, but 0 means infinity
+            val focusDiopters = if (focusDistance <= 0.0f) 0.0f else (1.0f / focusDistance)
             val clampedFocus = focusDistanceRange?.clamp(focusDiopters) ?: focusDiopters
             currentISO = clampedISO
             currentExposureTime = clampedExposureNs
@@ -409,7 +415,6 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
                 "appliedFocusDistance" to currentFocusDistance,
                 "supportsManualSensor" to supportsManualSensor
             ))
-
         } catch (e: Exception) {
             Log.e(TAG, "Error applying camera settings", e)
             result.error("SETTINGS_FAILED", e.message, null)
@@ -430,13 +435,11 @@ class AuroraCameraPlugin : FlutterPlugin, MethodChannel.MethodCallHandler {
             Log.d(TAG, "Starting photo capture")
             Log.d(TAG, "  Using settings - ISO: $currentISO, Exposure: ${currentExposureTime}ns, Focus: $currentFocusDistance, AutoFocus: $useAutoFocus")
 
-            // Create capture request with manual settings
             val captureRequestBuilder = device.createCaptureRequest(CameraDevice.TEMPLATE_STILL_CAPTURE)
             captureRequestBuilder.addTarget(reader.surface)
 
             if (supportsManualSensor) {
                 Log.d(TAG, "Applying manual sensor controls")
-                // Apply manual controls
                 captureRequestBuilder.set(CaptureRequest.CONTROL_MODE, CameraMetadata.CONTROL_MODE_OFF)
                 captureRequestBuilder.set(CaptureRequest.SENSOR_SENSITIVITY, currentISO)
                 captureRequestBuilder.set(CaptureRequest.SENSOR_EXPOSURE_TIME, currentExposureTime)

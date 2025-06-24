@@ -1,3 +1,8 @@
+import java.util.Properties
+val keystoreProperties = Properties().apply {
+    load(File(rootProject.projectDir, "key.properties").inputStream())
+}
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -6,7 +11,7 @@ plugins {
 }
 
 android {
-    namespace = "com.example.aurora_viking_app"  // ← MATCH FIREBASE REGISTRATION!
+    namespace = "com.auroraviking.app"  // ← UPDATED: Use your unique package name
     compileSdk = 35
     ndkVersion = "27.0.12077973"
 
@@ -25,8 +30,17 @@ android {
         getByName("main").java.srcDirs("src/main/kotlin")
     }
 
+    signingConfigs {
+        create("release") {
+            storeFile = file(keystoreProperties["storeFile"] as String)
+            storePassword = keystoreProperties["storePassword"] as String
+            keyAlias = keystoreProperties["keyAlias"] as String
+            keyPassword = keystoreProperties["keyPassword"] as String
+        }
+    }
+
     defaultConfig {
-        applicationId = "com.example.aurora_viking_app"  // ← MATCH FIREBASE REGISTRATION!
+        applicationId = "com.auroraviking.app"  // ← UPDATED: Use your unique package name
         minSdk = 24 // Updated from 23 to 24 for camerawesome compatibility
         targetSdk = flutter.targetSdkVersion
         versionCode = flutter.versionCode
@@ -38,9 +52,10 @@ android {
 
     buildTypes {
         getByName("release") {
-            // TODO: Add your own signing config for the release build.
-            // Signing with the debug keys for now, so `flutter run --release` works.
-            signingConfig = signingConfigs.getByName("debug")
+            isMinifyEnabled = true
+            isShrinkResources = true
+            signingConfig = signingConfigs.getByName("release")
+            proguardFiles(getDefaultProguardFile("proguard-android-optimize.txt"), "proguard-rules.pro")
         }
     }
 }

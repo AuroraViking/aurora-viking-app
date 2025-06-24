@@ -86,7 +86,7 @@ class _AuroraPostCardState extends State<AuroraPostCard> {
         });
       }
     } catch (e) {
-      print('Error fetching profile picture: $e');
+      // print('Error fetching profile picture: $e');
     }
   }
 
@@ -130,7 +130,7 @@ class _AuroraPostCardState extends State<AuroraPostCard> {
       _commentController.clear();
       _loadComments();
     } catch (e) {
-      print('Error adding comment: $e');
+      // print('Error adding comment: $e');
     }
   }
 

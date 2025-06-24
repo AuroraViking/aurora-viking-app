@@ -16,6 +16,7 @@ import '../widgets/forecast/cloud_forecast_map.dart';
 import '../services/auroral_power_service.dart';
 import '../widgets/forecast/auroral_power_chart.dart';
 import '../widgets/admob_banner_card.dart';
+import '../services/permission_util.dart';
 
 class ForecastTab extends StatefulWidget {
   const ForecastTab({super.key});
@@ -60,9 +61,9 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
   @override
   void initState() {
     super.initState();
-    _tabController = TabController(length: 3, vsync: this);
-    _loadData();
-    _loadCloudCoverData();
+    _requestLocationPermission();
+    _tabController = TabController(length: 3, vsync: this); // Fix: should be 3
+    _fetchInitialData();
     _auroralPowerService = AuroralPowerService();
     _auroralPowerService.auroralPowerStream.listen((data) {
       if (mounted) {
@@ -71,6 +72,21 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
         });
       }
     });
+  }
+
+  Future<void> _requestLocationPermission() async {
+    final granted = await PermissionUtil.requestLocationPermission();
+    if (!granted) {
+      // Optionally show a dialog or fallback UI
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(
+            content: Text('Location permission is required for map features.'),
+            backgroundColor: Colors.red,
+          ),
+        );
+      }
+    }
   }
 
   @override
@@ -96,7 +112,7 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
         _isLoadingCloudData = false;
       });
     } catch (e) {
-      print('Error loading cloud cover data: $e');
+      // print('Error loading cloud cover data: $e');
       setState(() => _isLoadingCloudData = false);
     }
   }
@@ -154,6 +170,11 @@ class _ForecastTabState extends State<ForecastTab> with SingleTickerProviderStat
         isLoading = false;
       });
     }
+  }
+
+  void _fetchInitialData() async {
+    await _loadData();
+    await _loadCloudCoverData();
   }
 
   String _formatTimestamp(DateTime timestamp) {
@@ -1388,7 +1409,7 @@ The Bz value is crucial for aurora formation - negative values are required for 
                      (astroStart == '00:00' && astroEnd == '0:00');
     }
 
-    print('Astro Start: $astroStart, Astro End: $astroEnd, isNoDarkness: $isNoDarkness'); // Debug print
+    // print('Astro Start: $astroStart, Astro End: $astroEnd, isNoDarkness: $isNoDarkness'); // Debug print
 
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,

@@ -72,7 +72,7 @@ class BokunService {
         throw Exception('Failed to fetch tours: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching tours: $e');
+      // print('Error fetching tours: $e');
       rethrow;
     }
   }
@@ -113,7 +113,7 @@ class BokunService {
         throw Exception('Failed to fetch past tours: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching past tours: $e');
+      // print('Error fetching past tours: $e');
       rethrow;
     }
   }
@@ -132,7 +132,7 @@ class BokunService {
         throw Exception('Failed to fetch tour details: ${response.statusCode}');
       }
     } catch (e) {
-      print('Error fetching tour details: $e');
+      // print('Error fetching tour details: $e');
       rethrow;
     }
   }
@@ -165,7 +165,7 @@ class BokunService {
       
       throw Exception('Failed to verify booking: ${response.statusCode}');
     } catch (e) {
-      print('❌ Error verifying booking: $e');
+      // print('❌ Error verifying booking: $e');
       rethrow;
     }
   }
@@ -179,7 +179,7 @@ class BokunService {
       );
       return response.statusCode == 200;
     } catch (e) {
-      print('Error testing API connection: $e');
+      // print('Error testing API connection: $e');
       return false;
     }
   }
@@ -251,7 +251,7 @@ class BokunService {
       
       return null;
     } catch (e) {
-      print('❌ Error verifying booking: $e');
+      // print('❌ Error verifying booking: $e');
       return null;
     }
   }

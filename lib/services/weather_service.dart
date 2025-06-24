@@ -9,7 +9,7 @@ class WeatherService {
     final apiKey = ConfigService.weatherApiKey;
     if (apiKey.isEmpty) {
       final errorMsg = 'OpenWeatherMap API key is missing.';
-      print(errorMsg);
+      // print(errorMsg);
       return {'error': errorMsg};
     }
     final response = await http.get(
@@ -28,8 +28,8 @@ class WeatherService {
       };
     } else {
       final errorMsg = 'Weather API error: ${response.statusCode} ${response.body}';
-      print(errorMsg);
+      // print(errorMsg);
       return {'error': errorMsg};
     }
   }
-} 
+}

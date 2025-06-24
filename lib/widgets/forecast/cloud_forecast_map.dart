@@ -9,6 +9,7 @@ import 'package:google_maps_flutter_android/google_maps_flutter_android.dart';
 import 'package:google_maps_flutter_platform_interface/google_maps_flutter_platform_interface.dart';
 import '../../services/cloud_forecast_service.dart';
 import 'package:flutter/services.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 
 class CloudForecastMap extends StatefulWidget {
   final Position position;
@@ -38,33 +39,43 @@ class _CloudForecastMapState extends State<CloudForecastMap> {
   @override
   void initState() {
     super.initState();
+    print('CloudForecastMap: initState, widget.position = \\${widget.position}');
+    // Print API key if available from env
+    const apiKey = String.fromEnvironment('GOOGLE_MAPS_API_KEY', defaultValue: 'NOT_SET');
+    print('CloudForecastMap: GOOGLE_MAPS_API_KEY (from env): $apiKey');
+    // Print package name
+    PackageInfo.fromPlatform().then((info) {
+      print('CloudForecastMap: packageName = \\${info.packageName}');
+    });
     _currentCenter = LatLng(widget.position.latitude, widget.position.longitude);
     _currentZoom = 7;
-    _loadForecast();
   }
 
   Future<void> _loadForecast() async {
     if (_isLoadingForecast) return;
-    
+    print('CloudForecastMap: _loadForecast called');
     setState(() {
       _isLoadingForecast = true;
     });
 
     try {
-      if (_mapController == null) return;
+      if (_mapController == null) {
+        print('CloudForecastMap: _mapController is null, aborting _loadForecast');
+        return;
+      }
 
       // Get the visible bounds
       final bounds = await _mapController!.getVisibleRegion();
+      print('CloudForecastMap: visible bounds = \\${bounds.toString()}');
       _visibleBounds = bounds;
       
-      print('Loading grid points...');
       // Calculate grid points based on visible bounds
       final gridPoints = _calculateGridPoints(bounds);
+      print('CloudForecastMap: gridPoints count = \\${gridPoints.length}');
       
       // Get forecasts for all grid points
       final forecasts = await _forecastService.getCloudForecastForPoints(gridPoints);
-      
-      print('Grid points loaded: ${forecasts.length} points');
+      print('CloudForecastMap: forecasts loaded, count = \\${forecasts.length}');
       
       if (mounted) {
         setState(() {
@@ -73,7 +84,7 @@ class _CloudForecastMapState extends State<CloudForecastMap> {
         });
       }
     } on TimeoutException catch (e) {
-      print('Timeout loading forecast: $e');
+      print('CloudForecastMap: Timeout loading forecast: \\${e.toString()}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(
@@ -83,11 +94,11 @@ class _CloudForecastMapState extends State<CloudForecastMap> {
         );
       }
     } catch (e) {
-      print('Error loading forecast: $e');
+      print('CloudForecastMap: Error loading forecast: \\${e.toString()}');
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text('Error loading forecast: $e'),
+            content: Text('Error loading forecast: \\${e.toString()}'),
             backgroundColor: Colors.red,
           ),
         );
@@ -130,7 +141,7 @@ class _CloudForecastMapState extends State<CloudForecastMap> {
 
   void _updateCloudPolygons() {
     if (_forecastPoints == null || _visibleBounds == null) {
-      print('Missing forecast data or bounds');
+      print('CloudForecastMap: Missing forecast data or bounds in _updateCloudPolygons');
       return;
     }
 
@@ -192,7 +203,7 @@ class _CloudForecastMapState extends State<CloudForecastMap> {
       );
     }
     
-    print('Created ${polygons.length} polygons');
+    print('CloudForecastMap: Created \\${polygons.length} polygons');
     
     if (mounted) {
       setState(() {
@@ -203,202 +214,205 @@ class _CloudForecastMapState extends State<CloudForecastMap> {
 
   @override
   Widget build(BuildContext context) {
+    print('CloudForecastMap: build called, _currentCenter = \\${_currentCenter}, _currentZoom = \\${_currentZoom}, myLocationEnabled: true, polygons: \\${_cloudPolygons.length}');
     final screenHeight = MediaQuery.of(context).size.height;
     final mapHeight = screenHeight * 0.6; // Reduced from 0.7 to 0.6 to prevent overflow
     
-    return Expanded(
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
-            padding: const EdgeInsets.all(12),
-            decoration: BoxDecoration(
-              color: Colors.black.withOpacity(0.7),
-              borderRadius: BorderRadius.circular(12),
-              border: Border.all(
-                color: Colors.tealAccent.withOpacity(0.3),
-              ),
-            ),
-            child: Row(
-              children: [
-                Icon(Icons.info_outline, color: Colors.tealAccent, size: 20),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: Text(
-                    'After panning to a new location, the app will generate a custom cloud cover forecast for that area. This process may take up to 60 seconds. The forecast will update automatically when you stop moving the map.',
-                    style: TextStyle(
-                      color: Colors.white.withOpacity(0.9),
-                      fontSize: 13,
-                      height: 1.4,
-                    ),
-                  ),
-                ),
-              ],
+    return Column(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          margin: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+          padding: const EdgeInsets.all(12),
+          decoration: BoxDecoration(
+            color: Colors.black.withOpacity(0.7),
+            borderRadius: BorderRadius.circular(12),
+            border: Border.all(
+              color: Colors.tealAccent.withOpacity(0.3),
             ),
           ),
-          Container(
-            height: mapHeight,
-            margin: const EdgeInsets.only(bottom: 0), // Remove bottom margin to prevent overflow
-            decoration: BoxDecoration(
-              borderRadius: const BorderRadius.only(
-                topLeft: Radius.circular(20),
-                topRight: Radius.circular(20),
-              ),
-              border: Border.all(
-                color: Colors.tealAccent.withOpacity(0.3),
-                width: 1,
-              ),
-              boxShadow: [
-                BoxShadow(
-                  color: Colors.black.withOpacity(0.5),
-                  blurRadius: 10,
-                  offset: const Offset(0, -4),
+          child: Row(
+            children: [
+              Icon(Icons.info_outline, color: Colors.tealAccent, size: 20),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Text(
+                  'After panning to a new location, the app will generate a custom cloud cover forecast for that area. This process may take up to 60 seconds. The forecast will update automatically when you stop moving the map.',
+                  style: TextStyle(
+                    color: Colors.white.withOpacity(0.9),
+                    fontSize: 13,
+                    height: 1.4,
+                  ),
                 ),
-              ],
+              ),
+            ],
+          ),
+        ),
+        Container(
+          height: mapHeight,
+          margin: const EdgeInsets.only(bottom: 0), // Remove bottom margin to prevent overflow
+          decoration: BoxDecoration(
+            borderRadius: const BorderRadius.only(
+              topLeft: Radius.circular(20),
+              topRight: Radius.circular(20),
             ),
-            child: Stack(
-              children: [
-                ClipRRect(
-                  borderRadius: const BorderRadius.only(
-                    topLeft: Radius.circular(20),
-                    topRight: Radius.circular(20),
-                  ),
-                  child: GoogleMap(
-                    initialCameraPosition: CameraPosition(
-                      target: _currentCenter,
-                      zoom: _currentZoom,
-                    ),
-                    onMapCreated: (controller) {
-                      setState(() {
-                        _mapController = controller;
-                        _isMapLoading = false;
-                      });
-                    },
-                    myLocationEnabled: true,
-                    myLocationButtonEnabled: true,
-                    zoomControlsEnabled: true,
-                    mapToolbarEnabled: false,
-                    mapType: MapType.terrain,
-                    polygons: _cloudPolygons,
-                    onCameraMove: (position) {
-                      setState(() {
-                        _currentCenter = position.target;
-                        _currentZoom = position.zoom;
-                      });
-                    },
-                    onCameraIdle: () {
-                      _loadForecast();
-                    },
-                  ),
+            border: Border.all(
+              color: Colors.tealAccent.withOpacity(0.3),
+              width: 1,
+            ),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withOpacity(0.5),
+                blurRadius: 10,
+                offset: const Offset(0, -4),
+              ),
+            ],
+          ),
+          child: Stack(
+            children: [
+              ClipRRect(
+                borderRadius: const BorderRadius.only(
+                  topLeft: Radius.circular(20),
+                  topRight: Radius.circular(20),
                 ),
-                if (_isMapLoading || _isLoadingForecast)
-                  Positioned(
-                    top: 16,
-                    left: 16,
-                    right: 16,
-                    child: Container(
-                      padding: const EdgeInsets.all(8),
-                      decoration: BoxDecoration(
-                        color: Colors.black.withOpacity(0.7),
-                        borderRadius: BorderRadius.circular(8),
-                      ),
-                      child: const Row(
-                        mainAxisSize: MainAxisSize.min,
-                        children: [
-                          CircularProgressIndicator(
-                            color: Colors.tealAccent,
-                          ),
-                          SizedBox(width: 16),
-                          Text(
-                            'Loading forecast data...',
-                            style: TextStyle(
-                              color: Colors.white,
-                              fontSize: 14,
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
+                child: GoogleMap(
+                  initialCameraPosition: CameraPosition(
+                    target: _currentCenter,
+                    zoom: _currentZoom,
                   ),
+                  onMapCreated: (controller) {
+                    print('CloudForecastMap: GoogleMap onMapCreated called');
+                    setState(() {
+                      _mapController = controller;
+                      _isMapLoading = false;
+                    });
+                    _loadForecast(); // Move here
+                  },
+                  myLocationEnabled: true,
+                  myLocationButtonEnabled: true,
+                  zoomControlsEnabled: true,
+                  mapToolbarEnabled: false,
+                  mapType: MapType.terrain,
+                  polygons: _cloudPolygons,
+                  onCameraMove: (position) {
+                    print('CloudForecastMap: onCameraMove, position = \\${position.target}, zoom = \\${position.zoom}');
+                    setState(() {
+                      _currentCenter = position.target;
+                      _currentZoom = position.zoom;
+                    });
+                  },
+                  onCameraIdle: () {
+                    print('CloudForecastMap: onCameraIdle');
+                    _loadForecast();
+                  },
+                ),
+              ),
+              if (_isMapLoading || _isLoadingForecast)
                 Positioned(
-                  bottom: 0, // Move to very bottom to prevent overflow
+                  top: 16,
                   left: 16,
                   right: 16,
                   child: Container(
-                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                    padding: const EdgeInsets.all(8),
                     decoration: BoxDecoration(
                       color: Colors.black.withOpacity(0.7),
-                      borderRadius: BorderRadius.circular(12),
-                      border: Border.all(
-                        color: Colors.tealAccent.withOpacity(0.3),
-                      ),
+                      borderRadius: BorderRadius.circular(8),
                     ),
-                    child: Column(
+                    child: const Row(
                       mainAxisSize: MainAxisSize.min,
                       children: [
+                        CircularProgressIndicator(
+                          color: Colors.tealAccent,
+                        ),
+                        SizedBox(width: 16),
                         Text(
-                          _getTimeLabel(),
-                          style: const TextStyle(
+                          'Loading forecast data...',
+                          style: TextStyle(
                             color: Colors.white,
                             fontSize: 14,
-                            fontWeight: FontWeight.bold,
                           ),
-                        ),
-                        const SizedBox(height: 8),
-                        _buildTimeLabels(),
-                        const SizedBox(height: 4),
-                        Stack(
-                          children: [
-                            SizedBox(
-                              height: 20,
-                              child: Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                                children: List.generate(49, (index) {
-                                  return Container(
-                                    width: 1,
-                                    height: 8,
-                                    color: Colors.tealAccent.withOpacity(0.5),
-                                  );
-                                }),
-                              ),
-                            ),
-                            SliderTheme(
-                              data: SliderThemeData(
-                                activeTrackColor: Colors.tealAccent,
-                                inactiveTrackColor: Colors.tealAccent.withOpacity(0.3),
-                                thumbColor: Colors.tealAccent,
-                                overlayColor: Colors.tealAccent.withOpacity(0.2),
-                                valueIndicatorColor: Colors.tealAccent,
-                                valueIndicatorTextStyle: const TextStyle(
-                                  color: Colors.black,
-                                  fontSize: 12,
-                                ),
-                                trackHeight: 4,
-                                activeTickMarkColor: Colors.tealAccent,
-                                inactiveTickMarkColor: Colors.tealAccent.withOpacity(0.3),
-                                tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 4),
-                              ),
-                              child: Slider(
-                                value: _timeOffset,
-                                min: 0,
-                                max: 96,
-                                divisions: 96,
-                                label: _getTimeLabel(),
-                                onChanged: _updateTimeOffset,
-                              ),
-                            ),
-                          ],
                         ),
                       ],
                     ),
                   ),
                 ),
-              ],
-            ),
+              Positioned(
+                bottom: 0, // Move to very bottom to prevent overflow
+                left: 16,
+                right: 16,
+                child: Container(
+                  padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                  decoration: BoxDecoration(
+                    color: Colors.black.withOpacity(0.7),
+                    borderRadius: BorderRadius.circular(12),
+                    border: Border.all(
+                      color: Colors.tealAccent.withOpacity(0.3),
+                    ),
+                  ),
+                  child: Column(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      Text(
+                        _getTimeLabel(),
+                        style: const TextStyle(
+                          color: Colors.white,
+                          fontSize: 14,
+                          fontWeight: FontWeight.bold,
+                        ),
+                      ),
+                      const SizedBox(height: 8),
+                      _buildTimeLabels(),
+                      const SizedBox(height: 4),
+                      Stack(
+                        children: [
+                          SizedBox(
+                            height: 20,
+                            child: Row(
+                              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                              children: List.generate(49, (index) {
+                                return Container(
+                                  width: 1,
+                                  height: 8,
+                                  color: Colors.tealAccent.withOpacity(0.5),
+                                );
+                              }),
+                            ),
+                          ),
+                          SliderTheme(
+                            data: SliderThemeData(
+                              activeTrackColor: Colors.tealAccent,
+                              inactiveTrackColor: Colors.tealAccent.withOpacity(0.3),
+                              thumbColor: Colors.tealAccent,
+                              overlayColor: Colors.tealAccent.withOpacity(0.2),
+                              valueIndicatorColor: Colors.tealAccent,
+                              valueIndicatorTextStyle: const TextStyle(
+                                color: Colors.black,
+                                fontSize: 12,
+                              ),
+                              trackHeight: 4,
+                              activeTickMarkColor: Colors.tealAccent,
+                              inactiveTickMarkColor: Colors.tealAccent.withOpacity(0.3),
+                              tickMarkShape: const RoundSliderTickMarkShape(tickMarkRadius: 4),
+                            ),
+                            child: Slider(
+                              value: _timeOffset,
+                              min: 0,
+                              max: 96,
+                              divisions: 96,
+                              label: _getTimeLabel(),
+                              onChanged: _updateTimeOffset,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                ),
+              ),
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 
@@ -449,7 +463,7 @@ class _CloudForecastMapState extends State<CloudForecastMap> {
 
   Future<void> _updateTimeOffset(double value) async {
     if (_forecastPoints == null) {
-      print('Cannot update time offset: missing forecast data');
+      // print('Cannot update time offset: missing forecast data');
       return;
     }
 

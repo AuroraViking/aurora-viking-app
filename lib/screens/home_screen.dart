@@ -71,10 +71,10 @@ class _HomeScreenState extends State<HomeScreen> with TickerProviderStateMixin {
         _errorMessage = null;
       });
 
-      print('✅ Services initialized successfully');
-      print('👤 User: ${_firebaseService.userDisplayName}');
+      // print('✅ Services initialized successfully');
+      // print('👤 User: \\${_firebaseService.userDisplayName}');
     } catch (e) {
-      print('❌ Service initialization failed: $e');
+      // print('❌ Service initialization failed: $e');
       setState(() {
         _isInitialized = false;
         _errorMessage = 'Failed to initialize services: $e';

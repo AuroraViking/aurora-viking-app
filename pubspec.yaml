@@ -55,7 +55,7 @@ dependencies:
   sqflite: ^2.4.2
   path: ^1.8.0
   # E-commerce & Payments
-  flutter_stripe: ^11.5.0
+  # flutter_stripe: ^11.5.0
 
   # Utilities
   intl: ^0.20.2

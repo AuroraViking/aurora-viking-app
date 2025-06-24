@@ -37,7 +37,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         _profilePictureUrl = profileUrl;
       });
     } catch (e) {
-      print('❌ Failed to load user data: $e');
+      // print('❌ Failed to load user data: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -60,7 +60,7 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         setState(() => _profilePictureUrl = url);
             }
     } catch (e) {
-      print('❌ Failed to pick/upload image: $e');
+      // print('❌ Failed to pick/upload image: $e');
     } finally {
       setState(() => _isLoading = false);
     }
@@ -463,4 +463,4 @@ class _ProfileSettingsScreenState extends State<ProfileSettingsScreen> {
         return 'Guest';
     }
   }
-} 
+}

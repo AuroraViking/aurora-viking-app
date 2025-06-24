@@ -83,7 +83,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
         }
       }
     } catch (e) {
-      print('Error getting location: $e');
+      // print('Error getting location: $e');
       if (mounted) {
         setState(() => _isLoadingLocation = false);
       }
@@ -103,7 +103,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
         });
       }
     } catch (e) {
-      print('Error loading sightings: $e');
+      // print('Error loading sightings: $e');
       if (mounted) {
         setState(() => _isLoading = false);
       }
@@ -143,7 +143,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
         });
       }
     } catch (e) {
-      print('Error loading nearby sightings: $e');
+      // print('Error loading nearby sightings: $e');
     }
   }
 
@@ -271,7 +271,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
                         });
                       }
                     } catch (e) {
-                      print('Error liking sighting: $e');
+                      // print('Error liking sighting: $e');
                       ScaffoldMessenger.of(context).showSnackBar(
                         const SnackBar(
                           content: Text('Failed to like sighting. Please try again.'),
@@ -358,7 +358,7 @@ class _AuroraAlertsTabState extends State<AuroraAlertsTab>
                   });
                 }
               } catch (e) {
-                print('Error liking sighting: $e');
+                // print('Error liking sighting: $e');
                 ScaffoldMessenger.of(context).showSnackBar(
                   const SnackBar(
                     content: Text('Failed to like sighting. Please try again.'),

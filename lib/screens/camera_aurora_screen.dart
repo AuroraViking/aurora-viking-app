@@ -220,7 +220,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
         });
       }
     } catch (e) {
-      print('⚠️ Error disposing camera: $e');
+      // print('⚠️ Error disposing camera: $e');
     }
   }
 
@@ -237,11 +237,11 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       if (result['success'] == true) {
         HapticFeedback.selectionClick();
       } else {
-        print('⚠️ Failed to apply some camera settings: ${result['error']}');
+        // print('⚠️ Failed to apply some camera settings: \\${result['error']}');
       }
       
     } catch (e) {
-      print('❌ Error applying camera settings: $e');
+      // print('❌ Error applying camera settings: $e');
     }
   }
 
@@ -305,7 +305,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
         _isCapturing = false;
       });
       
-      print('❌ Failed to capture photo: $e');
+      // print('❌ Failed to capture photo: $e');
       ScaffoldMessenger.of(context).hideCurrentSnackBar();
       _showErrorDialog('Failed to capture photo: $e');
     }
@@ -376,7 +376,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
           }
         });
       } catch (e) {
-        print('Geocoding error: $e');
+        // print('Geocoding error: $e');
         setState(() {
           _currentPosition = position;
           _locationName = 'Location found';
@@ -384,7 +384,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       }
 
     } catch (e) {
-      print('Location error: $e');
+      // print('Location error: $e');
       setState(() {
         _locationName = 'Location unavailable: ${e.toString()}';
       });
@@ -420,7 +420,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       _showSuccessDialog();
 
     } catch (e) {
-      print('❌ Error submitting sighting: $e');
+      // print('❌ Error submitting sighting: $e');
       
       // Check if it's a block error and show specific message
       if (e.toString().contains('blocked')) {
@@ -656,7 +656,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
         _solarWindDensity = solarWindData.density;
       });
     } catch (e) {
-      print('Error fetching aurora data: $e');
+      // print('Error fetching aurora data: $e');
     }
   }
 
@@ -679,7 +679,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
       // Optionally re-apply camera settings to update focus mode
       _applyCameraSettings();
     } catch (e) {
-      print('Error setting focus mode: $e');
+      // print('Error setting focus mode: $e');
     }
   }
 
@@ -696,7 +696,7 @@ class _CameraAuroraScreenState extends State<CameraAuroraScreen>
                 ? AndroidView(
                     viewType: 'aurora_camera_preview',
                     onPlatformViewCreated: (id) {
-                      print('🔧 Camera preview created with ID: $id');
+                      // print('🔧 Camera preview created with ID: $id');
                     },
                   )
                 : Container(

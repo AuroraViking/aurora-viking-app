@@ -7,6 +7,25 @@
   "client": [
     {
       "client_info": {
+        "mobilesdk_app_id": "1:299891974552:android:e3b3f193b04751c233cbed",
+        "android_client_info": {
+          "package_name": "com.auroraviking.app"
+        }
+      },
+      "oauth_client": [],
+      "api_key": [
+        {
+          "current_key": "AIzaSyAi5MNG1dkumnOaaiNnBdQ-_iU4E0OJFMw"
+        }
+      ],
+      "services": {
+        "appinvite_service": {
+          "other_platform_oauth_client": []
+        }
+      }
+    },
+    {
+      "client_info": {
         "mobilesdk_app_id": "1:299891974552:android:86ff262993a30d4433cbed",
         "android_client_info": {
           "package_name": "com.example.aurora_viking_app"

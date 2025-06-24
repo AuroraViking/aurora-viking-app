@@ -66,7 +66,7 @@ class _PrintsTabState extends State<PrintsTab> with TickerProviderStateMixin {
         _isLoading = false;
       });
     } catch (e) {
-      print('Error loading products: $e');
+      // print('Error loading products: $e');
       setState(() {
         _isLoading = false;
       });

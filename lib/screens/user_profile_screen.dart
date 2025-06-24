@@ -46,7 +46,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         });
       }
     } catch (e) {
-      print('Error loading user data: $e');
+      // print('Error loading user data: $e');
       if (mounted) {
         setState(() {
           _isLoading = false;
@@ -71,7 +71,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
         });
       }
     } catch (e) {
-      print('Error loading user sightings: $e');
+      // print('Error loading user sightings: $e');
     }
   }
 
@@ -211,7 +211,7 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
                                 });
                               }
                             } catch (e) {
-                              print('Error liking sighting: $e');
+                              // print('Error liking sighting: $e');
                               ScaffoldMessenger.of(context).showSnackBar(
                                 const SnackBar(
                                   content: Text('Failed to like sighting. Please try again.'),
@@ -303,4 +303,4 @@ class _UserProfileScreenState extends State<UserProfileScreen> {
       ],
     );
   }
-} 
+}
