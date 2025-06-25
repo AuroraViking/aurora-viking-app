@@ -3,6 +3,14 @@ val keystoreProperties = Properties().apply {
     load(File(rootProject.projectDir, "key.properties").inputStream())
 }
 
+// Load local.properties for API keys
+val localProperties = Properties().apply {
+    val localPropertiesFile = rootProject.file("local.properties")
+    if (localPropertiesFile.exists()) {
+        load(localPropertiesFile.inputStream())
+    }
+}
+
 plugins {
     id("com.android.application")
     id("kotlin-android")
@@ -46,8 +54,11 @@ android {
         versionCode = flutter.versionCode
         versionName = flutter.versionName
         
-        // Add Google Maps API key configuration
-        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = project.findProperty("GOOGLE_MAPS_API_KEY") as String? ?: ""
+        // Add Google Maps API key configuration - try multiple sources
+        manifestPlaceholders["GOOGLE_MAPS_API_KEY"] = localProperties.getProperty("GOOGLE_MAPS_API_KEY") 
+            ?: project.findProperty("GOOGLE_MAPS_API_KEY") as String? 
+            ?: System.getenv("GOOGLE_MAPS_API_KEY") 
+            ?: ""
     }
 
     buildTypes {

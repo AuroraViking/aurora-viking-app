@@ -5,6 +5,9 @@
 .env.test
 .env.production
 
+# Android local properties (contains API keys)
+android/local.properties
+
 # Flutter/Dart specific
 .dart_tool/
 .flutter-plugins
